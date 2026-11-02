@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="{{ sprache }}" data-thema="{{ thema }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ t.titel }}</title>
+<link rel="stylesheet" href="{{ basis }}statisch/ansicht.css">
+<script src="{{ basis }}statisch/ansicht.js" defer></script>
+</head>
+<body data-basis="{{ basis }}" data-sprache="{{ sprache }}" data-fehler="{{ t.fehler }}">
+<div class="kopf">
+  <p class="leise">{{ t.einleitung }}
+    {% if ablauf %}{{ t.ablauf.format(tage=ablauf) }}{% else %}{{ t.ablauf_nie }}{% endif %}</p>
+  <p id="meldung" class="meldung" role="status" hidden></p>
+</div>
+
+{% if not gruppen %}
+  <p class="leer">{{ t.leer }}</p>
+{% else %}
+<div class="raster">
+  <nav class="liste" aria-label="{{ t.sitzungen }}">
+    {% for platz, sitzungen in gruppen.items() %}
+      {% if not arbeitsplatz %}<h3>{{ platz }}</h3>{% endif %}
+      <ul>
+      {% for s in sitzungen %}
+        <li><a href="{{ query(s=s.kennung) }}" {% if aktuell and s.kennung == aktuell.kennung %}aria-current="page"{% endif %}>
+          <span class="name">{{ s.eigener_titel or s.titel or s.kennung }}</span>
+          <span class="leise">{{ s.verzeichnis }}</span>
+          <span class="leise">{{ datum(s.zuletzt_aktiv) }} · {{ s.anzahl }} {{ t.eintraege }}</span>
+        </a></li>
+      {% endfor %}
+      </ul>
+    {% endfor %}
+    {% if not arbeitsplatz %}
+      <button class="gefahr klein" data-aktion="alles_loeschen" data-frage="{{ t.alles_loeschen_frage }}">{{ t.alles_loeschen }}</button>
+    {% endif %}
+  </nav>
+
+  {% if aktuell %}
+  <main class="sitzung" data-sitzung="{{ aktuell.kennung }}">
+    <header>
+      <h2>{{ aktuell.eigener_titel or aktuell.titel or aktuell.kennung }}</h2>
+      <dl>
+        <dt>{{ t.verzeichnis }}</dt><dd><code>{{ aktuell.verzeichnis or "—" }}</code></dd>
+        <dt>{{ t.arbeitsplatz }}</dt><dd>{{ aktuell.arbeitsplatz_name or "—" }}</dd>
+        <dt>{{ t.zuletzt }}</dt><dd>{{ datum(aktuell.zuletzt_aktiv) }}</dd>
+        <dt>{{ t.kennung }}</dt><dd><code>{{ aktuell.kennung }}</code></dd>
+      </dl>
+      <div class="knoepfe">
+        <form class="inline" data-aktion="umbenennen">
+          <input name="titel" value="{{ aktuell.eigener_titel or '' }}" placeholder="{{ t.titel_eigen }}" aria-label="{{ t.titel_eigen }}" maxlength="300">
+          <button>{{ t.umbenennen }}</button>
+        </form>
+        <a class="knopf" href="{{ basis }}export{{ query(format='json', s=aktuell.kennung) }}">{{ t.export_json }}</a>
+        <a class="knopf" href="{{ basis }}export{{ query(format='md', s=aktuell.kennung) }}">{{ t.export_md }}</a>
+        <button class="gefahr" data-aktion="sitzung_loeschen" data-frage="{{ t.sitzung_loeschen_frage }}">{{ t.sitzung_loeschen }}</button>
+      </div>
+    </header>
+
+    <details class="vorschau">
+      <summary>{{ t.vorschau }}</summary>
+      {% if vorschau %}<pre>{% for z in vorschau %}{{ z }}
+{% endfor %}</pre>{% else %}<p class="leise">{{ t.vorschau_leer }}</p>{% endif %}
+    </details>
+
+    <details class="neu">
+      <summary>{{ t.neu }}</summary>
+      <form data-aktion="neu">
+        <textarea name="inhalt" rows="3" maxlength="{{ laenge }}" required></textarea>
+        <div class="zeile">
+          <label>{{ t.art }} <select name="art">{% for a in arten %}<option{% if a == 'notiz' %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
+          <input name="schlagworte" placeholder="{{ t.schlagworte }}" aria-label="{{ t.schlagworte }}">
+          <button class="haupt">{{ t.speichern }}</button>
+        </div>
+      </form>
+    </details>
+
+    {% if eintraege %}
+    <div class="sammel">
+      <span class="leise">{{ t.markierte }}:</span>
+      <select id="ziel" aria-label="{{ t.ziel_waehlen }}">
+        <option value="">{{ t.ziel_waehlen }}</option>
+        {% for s in alle if s.kennung != aktuell.kennung %}
+          <option value="{{ s.kennung }}">{{ s.eigener_titel or s.titel or s.kennung }} — {{ s.arbeitsplatz_name }}</option>
+        {% endfor %}
+      </select>
+      <button data-sammel="kopieren">{{ t.kopieren_nach }}</button>
+      <button data-sammel="verschieben">{{ t.verschieben_nach }}</button>
+      <button class="gefahr" data-sammel="loeschen">{{ t.loeschen }}</button>
+    </div>
+    <ul class="eintraege">
+      {% for e in eintraege %}
+      <li class="eintrag{% if e.angeheftet %} angeheftet{% endif %}" data-id="{{ e.id }}" data-stand="{{ e.geaendert.isoformat() }}">
+        <div class="zeile">
+          <input type="checkbox" class="wahl" aria-label="{{ kurz(e.id) }}">
+          <span class="art">{{ e.art }}</span>
+          {% if e.angeheftet %}<span class="marke">{{ t.angeheftet }}</span>{% endif %}
+          <span class="leise">[{{ kurz(e.id) }}] {{ datum(e.geaendert) }} · {{ t['quelle_' ~ e.quelle] if ('quelle_' ~ e.quelle) in t else e.quelle }} · {{ t.genutzt.format(n=e.genutzt) }}</span>
+          <span class="rechts">
+            <button class="klein" data-anheften="{{ 0 if e.angeheftet else 1 }}">{{ t.loesen if e.angeheftet else t.anheften }}</button>
+            <button class="klein" data-bearbeiten>{{ t.bearbeiten }}</button>
+            <button class="klein gefahr" data-loeschen>{{ t.loeschen }}</button>
+          </span>
+        </div>
+        <p class="inhalt">{{ e.inhalt }}</p>
+        {% if e.schlagworte %}<p class="leise">{{ e.schlagworte | join(", ") }}</p>{% endif %}
+        <form class="bearbeiten" data-aktion="aendern" hidden>
+          <textarea name="inhalt" rows="3" maxlength="{{ laenge }}" required>{{ e.inhalt }}</textarea>
+          <div class="zeile">
+            <label>{{ t.art }} <select name="art">{% for a in arten %}<option{% if a == e.art %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
+            <input name="schlagworte" value="{{ e.schlagworte | join(', ') }}" aria-label="{{ t.schlagworte }}">
+            <button class="haupt">{{ t.speichern }}</button>
+            <button type="button" data-abbrechen>{{ t.abbrechen }}</button>
+          </div>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="leise">{{ t.keine_eintraege }}</p>
+    {% endif %}
+  </main>
+  {% endif %}
+</div>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,86 @@
+"""Nächtliche Pflege, um 03:30 (GEDAECHTNIS_PFLEGE_UHRZEIT):
+
+* Sitzungen ohne Aktivität seit `ablauf_tage` löschen (0: nie).
+* Einträge ohne Einbettung nachholen, auch nach einem Modellwechsel.
+* Widerrufene Tokens nach 7 Tagen, das Protokoll nach 180 Tagen löschen.
+
+Läuft unter `system=True`: Pflege geht über alle Menschen.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+from datetime import datetime
+
+from psycopg.types.json import Jsonb
+
+from . import einbettung, einstellungen
+from .db import verbindung
+
+log = logging.getLogger("gedaechtnis.pflege")
+
+
+def einmal() -> dict[str, int]:
+    w = einstellungen.werte()
+    erg = {"sitzungen": 0, "eingebettet": 0, "tokens": 0}
+    with verbindung(system=True) as conn:
+        if w["ablauf_tage"]:
+            erg["sitzungen"] = conn.execute(
+                "DELETE FROM sitzung WHERE zuletzt_aktiv < now() - make_interval(days => %s)",
+                (int(w["ablauf_tage"]),)).rowcount
+        erg["tokens"] = conn.execute(
+            "DELETE FROM token WHERE widerrufen < now() - interval '7 days'").rowcount
+        conn.execute("DELETE FROM protokoll WHERE zeit < now() - interval '180 days'")
+    modell = einbettung.modell()
+    if modell:
+        while True:
+            with verbindung(system=True) as conn:
+                offen = conn.execute(
+                    "SELECT id, inhalt FROM eintrag WHERE modell IS DISTINCT FROM %s LIMIT 64",
+                    (modell,)).fetchall()
+            if not offen:
+                break
+            vektoren = einbettung.einbetten([e["inhalt"] for e in offen], zeitlimit=60.0)
+            if not vektoren:
+                break
+            with verbindung(system=True) as conn:
+                for e, v in zip(offen, vektoren):
+                    conn.execute("UPDATE eintrag SET einbettung = %s::vector, modell = %s WHERE id = %s",
+                                 (einbettung.als_text(v), modell, e["id"]))
+            erg["eingebettet"] += len(offen)
+    with verbindung(system=True) as conn:
+        conn.execute("INSERT INTO einstellung (schluessel, wert) VALUES ('pflege_zuletzt', %s) "
+                     "ON CONFLICT (schluessel) DO UPDATE SET wert = EXCLUDED.wert",
+                     (Jsonb({"zeit": datetime.now().isoformat(timespec="seconds"), **erg}),))
+    log.info("Pflege: %s", erg)
+    return erg
+
+
+async def schleife() -> None:
+    uhrzeit = os.environ.get("GEDAECHTNIS_PFLEGE_UHRZEIT", "03:30")
+    stunde, minute = (int(x) for x in uhrzeit.split(":"))
+    zuletzt = None
+    nachholen = 0.0
+    while True:
+        await asyncio.sleep(60)
+        jetzt = datetime.now()
+        try:
+            if (jetzt.hour, jetzt.minute) >= (stunde, minute) and zuletzt != jetzt.date():
+                zuletzt = jetzt.date()
+                await asyncio.to_thread(einmal)
+            # Zwischendurch stündlich: Einbettungen nachholen, die beim
+            # Speichern fehlten (Server kurz weg).
+            elif einbettung.modell() and jetzt.timestamp() - nachholen > 3600:
+                nachholen = jetzt.timestamp()
+                await asyncio.to_thread(_nachholen)
+        except Exception as exc:  # noqa: BLE001 — die Schleife darf nie sterben
+            log.warning("Pflege fehlgeschlagen: %s", exc)
+
+
+def _nachholen() -> None:
+    with verbindung(system=True) as conn:
+        offen = conn.execute("SELECT count(*) AS n FROM eintrag WHERE modell IS DISTINCT FROM %s",
+                             (einbettung.modell(),)).fetchone()["n"]
+    if offen:
+        einmal()

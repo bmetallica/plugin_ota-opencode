@@ -1,0 +1,34 @@
+# Testlauf: eigene Datenbank, eigenes Netz, nichts von OTA nötig.
+#   make test
+name: plugin-ota-opencode-test
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: gedaechtnis
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: gedaechtnis
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gedaechtnis -d gedaechtnis"]
+      interval: 2s
+      retries: 30
+
+  pruefer:
+    image: ota-gedaechtnis:test
+    build:
+      context: ..
+      args:
+        http_proxy: "${HTTP_PROXY:-}"
+        https_proxy: "${HTTPS_PROXY:-}"
+    user: "0:0"
+    environment:
+      GEDAECHTNIS_DB: postgresql://gedaechtnis:test@db/gedaechtnis
+    working_dir: /app
+    volumes:
+      - ./:/app/tests:ro
+    command: ["sh", "-c", "pip install -q --no-cache-dir pytest==9.2.0 && python -m pytest -q -p no:cacheprovider tests"]
+    depends_on:
+      db:
+        condition: service_healthy

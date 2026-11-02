@@ -1,0 +1,70 @@
+/* Die Ansicht im Rahmen von OTA — dieselben Farben wie OTA (dunkel und
+   hell), damit sie nicht wie ein Fremdkörper wirkt. */
+:root {
+  --ground: #090D16; --bay: #0F172A; --bay-2: #1B2436; --well: #060A12;
+  --edge: #1E293B; --edge-lit: #334155;
+  --text: #F1F5F9; --label: #94A3B8; --mute: #64748B;
+  --accent: #06B6D4; --halt: #EF4444; --halt-bg: rgba(239, 68, 68, .14);
+  --ok: #10B981; --r: 7px;
+  color-scheme: dark;
+}
+:root[data-thema="hell"] {
+  --ground: #F1F4F9; --bay: #FFFFFF; --bay-2: #E9EDF4; --well: #F7F9FC;
+  --edge: #D7DEE8; --edge-lit: #B4BFCD;
+  --text: #0F172A; --label: #4A5568; --mute: #6B7684;
+  --accent: #0E7490; --halt: #B91C1C; --halt-bg: rgba(185, 28, 28, .10);
+  --ok: #047857;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { padding: 12px 16px 24px; }
+code, pre { font-family: ui-monospace, "IBM Plex Mono", monospace; font-size: 12.5px; }
+.leise { color: var(--label); font-size: 12.5px; }
+.kopf p { margin: 0 0 8px; }
+.meldung { padding: 6px 10px; border-radius: var(--r); background: var(--bay-2); border: 1px solid var(--edge-lit); }
+.meldung.fehler { border-color: var(--halt); background: var(--halt-bg); }
+.leer { padding: 24px; text-align: center; color: var(--label); background: var(--bay); border: 1px dashed var(--edge-lit); border-radius: 10px; }
+.raster { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 760px) { .raster { grid-template-columns: 1fr; } }
+.liste { background: var(--bay); border: 1px solid var(--edge); border-radius: 10px; padding: 8px; }
+.liste h3 { margin: 10px 8px 4px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); }
+.liste ul { list-style: none; margin: 0; padding: 0; }
+.liste a { display: flex; flex-direction: column; padding: 7px 9px; border-radius: var(--r); color: var(--text); text-decoration: none; }
+.liste a:hover { background: var(--bay-2); }
+.liste a[aria-current] { background: var(--bay-2); box-shadow: inset 2px 0 0 var(--accent); }
+.liste .name { font-weight: 600; overflow-wrap: anywhere; }
+.liste .leise { overflow-wrap: anywhere; }
+.liste > button { margin: 12px 8px 4px; }
+.sitzung { background: var(--bay); border: 1px solid var(--edge); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.sitzung h2 { margin: 0 0 8px; font-size: 18px; overflow-wrap: anywhere; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0 0 10px; font-size: 13px; }
+dt { color: var(--label); } dd { margin: 0; overflow-wrap: anywhere; }
+.knoepfe, .zeile, .sammel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inline { display: flex; gap: 6px; }
+button, .knopf { font: inherit; font-size: 13px; padding: 5px 11px; border-radius: var(--r); border: 1px solid var(--edge-lit);
+  background: var(--bay-2); color: var(--text); cursor: pointer; text-decoration: none; }
+button:hover, .knopf:hover { border-color: var(--accent); }
+button.haupt { background: var(--accent); border-color: var(--accent); color: var(--ground); font-weight: 600; }
+button.gefahr { color: var(--halt); }
+button.gefahr:hover { border-color: var(--halt); }
+button.klein { padding: 2px 8px; font-size: 12px; }
+input, select, textarea { font: inherit; font-size: 13px; color: var(--text); background: var(--well);
+  border: 1px solid var(--edge-lit); border-radius: var(--r); padding: 5px 8px; }
+textarea { width: 100%; resize: vertical; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px; }
+details { margin: 12px 0; border: 1px solid var(--edge); border-radius: var(--r); padding: 8px 10px; background: var(--well); }
+summary { cursor: pointer; color: var(--label); }
+details form { margin-top: 8px; display: grid; gap: 8px; }
+pre { white-space: pre-wrap; margin: 8px 0 0; color: var(--label); }
+.sammel { margin: 12px 0 6px; }
+.eintraege { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.eintrag { border: 1px solid var(--edge); border-radius: var(--r); padding: 8px 10px; background: var(--ground); }
+.eintrag.angeheftet { border-color: var(--accent); }
+.eintrag .inhalt { margin: 6px 0 2px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.eintrag form { display: grid; gap: 8px; margin-top: 6px; }
+.art { font-size: 11.5px; padding: 1px 7px; border-radius: 99px; background: var(--bay-2); border: 1px solid var(--edge-lit); }
+.marke { font-size: 11.5px; color: var(--accent); }
+.rechts { margin-left: auto; display: flex; gap: 6px; }

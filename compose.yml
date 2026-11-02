@@ -1,0 +1,78 @@
+# Gedächtnis für opencode — eine Erweiterung für OpenTerminalApps (OTA).
+#
+# Läuft neben OTA als eigenes Compose-Projekt. Von OTA braucht es nur das
+# Netz `ota_erweiterungen` (legt OTAs `make update` an). Ports auf dem Host
+# gibt es keine: OTA erreicht den Dienst über dieses Netz, Arbeitsplätze und
+# Browser nur über OTAs Traefik.
+#
+#   ./setup.sh          .env mit Passwort und Kopplungsschlüssel anlegen
+#   docker compose up -d --build
+name: plugin-ota-opencode
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        VERSION: "${GEDAECHTNIS_VERSION:-dev}"
+        PAKETSTAND: "${PAKETSTAND:-}"
+        http_proxy: "${HTTP_PROXY:-}"
+        https_proxy: "${HTTPS_PROXY:-}"
+        no_proxy: "${NO_PROXY:-}"
+    image: ota-gedaechtnis:${GEDAECHTNIS_VERSION:-dev}
+    container_name: ota-gedaechtnis
+    restart: unless-stopped
+    environment:
+      GEDAECHTNIS_DB: "postgresql://gedaechtnis:${GEDAECHTNIS_DB_PW:?setup.sh ausführen}@db/gedaechtnis"
+      GEDAECHTNIS_KOPPLUNGSSCHLUESSEL: "${GEDAECHTNIS_KOPPLUNGSSCHLUESSEL:?setup.sh ausführen}"
+      GEDAECHTNIS_PFLEGE_UHRZEIT: "${GEDAECHTNIS_PFLEGE_UHRZEIT:-03:30}"
+      GEDAECHTNIS_LOG: "${GEDAECHTNIS_LOG:-INFO}"
+      TZ: "${TZ:-Europe/Berlin}"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      ota_erweiterungen:
+        aliases: [ota-gedaechtnis]
+      intern: {}
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: ota-gedaechtnis-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gedaechtnis
+      POSTGRES_PASSWORD: "${GEDAECHTNIS_DB_PW:?setup.sh ausführen}"
+      POSTGRES_DB: gedaechtnis
+    volumes:
+      - daten:/var/lib/postgresql/data
+    networks:
+      - intern
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gedaechtnis -d gedaechtnis"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  ota_erweiterungen:
+    external: true
+  # Nur Dienst und Datenbank, ohne Weg nach draussen. Ein festes Subnetz:
+  # Docker vergibt sonst 172.x-Blöcke und danach 192.168.x — das kann das LAN
+  # überdecken, in dem der Embedding-Server steht, und der Dienst erreicht
+  # ihn nicht mehr. 10.98.x liegt neben OTAs Sitzungsbereich 10.99.0.0/16.
+  intern:
+    internal: true
+    ipam:
+      config:
+        - subnet: "${GEDAECHTNIS_NETZ:-10.98.254.0/28}"
+
+volumes:
+  daten:
+    name: ota_gedaechtnis_daten
