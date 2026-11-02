@@ -89,6 +89,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  document.querySelectorAll("[data-zugriff-nehmen]").forEach((b) => {
+    b.addEventListener("click", () => senden({ was: "zugriff_nehmen", quelle: b.dataset.zugriffNehmen }))
+  })
+
   document.querySelectorAll("[data-sammel]").forEach((b) => {
     b.addEventListener("click", () => {
       const ids = [...document.querySelectorAll(".eintrag")]

@@ -48,6 +48,8 @@ def _seite(request: Request, b: zugang.Betrachter, arbeitsplatz: str | None) -> 
     eintraege = speicher.eintraege(b.mensch, aktuell["kennung"]) if aktuell else []
     vorschau = speicher.abrufen(b.mensch, aktuell["kennung"], vorschau=True) if aktuell else []
     alle = speicher.sitzungen(b.mensch) if aktuell else []
+    zugriffe = speicher.zugriffe(b.mensch, aktuell["kennung"]) if aktuell else []
+    gelesen_von = speicher.gelesen_von(b.mensch, aktuell["kennung"]) if aktuell else []
     gruppen: dict[str, list[dict[str, Any]]] = {}
     for s in liste:
         gruppen.setdefault(s["arbeitsplatz_name"] or t["ohne_arbeitsplatz"], []).append(s)
@@ -55,6 +57,7 @@ def _seite(request: Request, b: zugang.Betrachter, arbeitsplatz: str | None) -> 
     html = _jinja.get_template("ansicht.html").render(
         t=t, sprache=sprache, thema="hell" if request.query_params.get("thema") == "hell" else "dunkel",
         gruppen=gruppen, aktuell=aktuell, eintraege=eintraege, alle=alle,
+        zugriffe=zugriffe, gelesen_von=gelesen_von,
         vorschau=[speicher.zeile_fuer(e) for e in vorschau], arten=speicher.ARTEN,
         arbeitsplatz=arbeitsplatz, name=b.name, kurz=speicher.kurz,
         basis="../" if arbeitsplatz is not None else "",
@@ -132,6 +135,12 @@ async def aktion(request: Request) -> JSONResponse:
             n = speicher.uebertragen(b.mensch, [str(i) for i in body.get("ids") or []],
                                      str(body.get("ziel") or ""), was == "verschieben")
             return JSONResponse({"ok": True, "meldung": t["uebertragen_n"].format(n=n)})
+        if was == "zugriff_geben":
+            speicher.zugriff_geben(b.mensch, s, str(body.get("quelle") or ""))
+            return JSONResponse({"ok": True, "meldung": t["zugriff_gegeben"]})
+        if was == "zugriff_nehmen":
+            speicher.zugriff_nehmen(b.mensch, s, str(body.get("quelle") or ""))
+            return JSONResponse({"ok": True, "meldung": t["zugriff_genommen"]})
         if was == "umbenennen":
             speicher.sitzung_umbenennen(b.mensch, s, str(body.get("titel") or ""))
             return JSONResponse({"ok": True})

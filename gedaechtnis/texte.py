@@ -53,6 +53,19 @@ TEXTE = {
         "quelle_werkzeug": "von opencode",
         "genutzt": "{n}× abgerufen",
         "fehler": "Hat nicht geklappt",
+        "zugriff": "Zugriff auf andere Sitzungen",
+        "zugriff_hinweis": "Diese Sitzung liest zusätzlich das Gedächtnis der Sitzungen hier — "
+                           "nur lesen; was sie selbst speichert, bleibt bei ihr.",
+        "zugriff_keiner": "Keiner. Diese Sitzung sieht nur ihr eigenes Gedächtnis.",
+        "zugriff_geben": "Zugriff geben",
+        "zugriff_nehmen": "Zugriff entziehen",
+        "zugriff_waehlen": "Sitzung wählen, deren Gedächtnis diese mitlesen soll",
+        "zugriff_gegeben": "Zugriff gegeben — gilt beim nächsten Abruf in opencode.",
+        "zugriff_genommen": "Zugriff entzogen.",
+        "gelesen_von": "Wird mitgelesen von",
+        "zugriff_neu_hinweis": "Eine neue Sitzung erscheint hier, sobald opencode darin das "
+                               "Gedächtnis einmal benutzt hat (beim ersten Abruf, gleich zu Beginn).",
+        "herkunft": "aus",
     },
     "en": {
         "titel": "Memory",
@@ -106,5 +119,18 @@ TEXTE = {
         "quelle_werkzeug": "by opencode",
         "genutzt": "recalled {n}×",
         "fehler": "Did not work",
+        "zugriff": "Access to other sessions",
+        "zugriff_hinweis": "This session additionally reads the memory of the sessions here — "
+                           "read only; whatever it saves itself stays with it.",
+        "zugriff_keiner": "None. This session sees only its own memory.",
+        "zugriff_geben": "Grant access",
+        "zugriff_nehmen": "Revoke access",
+        "zugriff_waehlen": "Choose a session whose memory this one should read too",
+        "zugriff_gegeben": "Access granted — applies at the next recall in opencode.",
+        "zugriff_genommen": "Access revoked.",
+        "gelesen_von": "Read along by",
+        "zugriff_neu_hinweis": "A new session appears here as soon as opencode has used the "
+                               "memory in it once (at the first recall, right at the start).",
+        "herkunft": "from",
     },
 }

@@ -9,6 +9,8 @@ under **My account → Memory** and in a workspace tile's **⋯** menu.
 
 - **Every session sees only its own memory.** Subagents and forks share that of their root session.
   OTA's opencode plugin `ota-sitzung` fills in the session, not the model.
+- **Access to other sessions**, granted by the person in the view: session B then also reads the
+  memory of session A, read-only. That way work continues in B with what A knows.
 - **Survives** opencode summarising a long history and the session being continued days later
   (`opencode -c`).
 - **Five tools over MCP**, briefly described for local models: `memory_recall`, `memory_search`,

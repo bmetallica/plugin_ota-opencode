@@ -345,3 +345,41 @@ def test_ansicht_bearbeiten(c):
 def test_sicherung(c):
     r = c.get("/ota/v1/sicherung", headers=_dienst())
     assert r.status_code == 200 and r.content[:5] == b"PGDMP"
+
+
+def test_zugriff_auf_andere_sitzung(c):
+    m = str(uuid.uuid4())
+    platz, token = _platz(c, m, "erik")
+    _mcp(c, token, "memory_save", content="Session A: Migration bis Schritt 3 erledigt", ota_sitzung="ses_AA",
+         ota_titel="Migration")
+    _mcp(c, token, "memory_save", content="Session B: neuer Anfang", ota_sitzung="ses_BB", ota_titel="Weiter")
+    assert "Schritt 3" not in _mcp(c, token, "memory_recall", ota_sitzung="ses_BB")
+    kopf = {**_ansicht(m, "erik", [platz]), "X-OTA-Ansicht": "1"}
+    # Eine fremde Sitzung (anderer Mensch, gleiche Kennung gibt es dort nicht) geht nicht.
+    r = c.post("/ansicht/aktion", headers=kopf, json={"was": "zugriff_geben", "sitzung": "ses_BB", "quelle": "ses_fremd"})
+    assert not r.json()["ok"]
+    assert not c.post("/ansicht/aktion", headers=kopf, json={"was": "zugriff_geben", "sitzung": "ses_BB",
+                                                              "quelle": "ses_BB"}).json()["ok"]
+    assert c.post("/ansicht/aktion", headers=kopf, json={"was": "zugriff_geben", "sitzung": "ses_BB",
+                                                          "quelle": "ses_AA"}).json()["ok"]
+    r = _mcp(c, token, "memory_recall", ota_sitzung="ses_BB")
+    assert "Schritt 3" in r and 'from session "Migration", read-only' in r and "neuer Anfang" in r
+    assert "Schritt 3" in _mcp(c, token, "memory_search", query="Migration Schritt", ota_sitzung="ses_BB")
+    # Nur lesen: aus B lässt sich A nicht ändern oder löschen.
+    k = re.search(r"\[([0-9a-f]{8})\] \([^)]*from session", r).group(1)
+    assert "nur lesbar" in _mcp(c, token, "memory_forget", id=k, ota_sitzung="ses_BB")
+    assert "nur lesbar" in _mcp(c, token, "memory_update", id=k, content="x", ota_sitzung="ses_BB")
+    # Nicht umgekehrt: A sieht B nicht.
+    assert "neuer Anfang" not in _mcp(c, token, "memory_recall", ota_sitzung="ses_AA")
+    # Was B speichert, bleibt bei B.
+    _mcp(c, token, "memory_save", content="In B weitergemacht mit Schritt 4", ota_sitzung="ses_BB")
+    assert "Schritt 4" not in _mcp(c, token, "memory_recall", ota_sitzung="ses_AA")
+    seite = c.get("/ansicht/konto?s=ses_BB", headers=kopf).text
+    assert "Migration" in seite and "Zugriff entziehen" in seite
+    assert "Weiter" in c.get("/ansicht/konto?s=ses_AA", headers=kopf).text  # „wird mitgelesen von“
+    assert c.post("/ansicht/aktion", headers=kopf, json={"was": "zugriff_nehmen", "sitzung": "ses_BB",
+                                                          "quelle": "ses_AA"}).json()["ok"]
+    assert "Schritt 3" not in _mcp(c, token, "memory_recall", ota_sitzung="ses_BB")
+    # Ein anderer Mensch mit gleichen Kennungen sieht nichts davon.
+    _, tf = _platz(c, str(uuid.uuid4()), "fremd2")
+    assert "Schritt" not in _mcp(c, tf, "memory_recall", ota_sitzung="ses_BB")

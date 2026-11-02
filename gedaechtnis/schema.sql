@@ -105,3 +105,23 @@ CREATE POLICY nur_eigene ON eintrag USING (
 CREATE POLICY nur_eigene ON token USING (
   mensch::text = current_setting('ota.mensch', true)
   OR current_setting('ota.system', true) = 'an');
+
+-- @abschnitt 2
+-- Zugriff einer Sitzung auf das Gedächtnis einer anderen desselben Menschen:
+-- `sitzung` liest zusätzlich die Einträge von `quelle`. Nur lesen, nur direkt
+-- (nicht weiter über deren Zugriffe), vom Menschen in der Ansicht vergeben.
+CREATE TABLE zugriff (
+  mensch    uuid NOT NULL,
+  sitzung   text NOT NULL,
+  quelle    text NOT NULL,
+  angelegt  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (mensch, sitzung, quelle),
+  CHECK (sitzung <> quelle),
+  FOREIGN KEY (mensch, sitzung) REFERENCES sitzung(mensch, kennung) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (mensch, quelle) REFERENCES sitzung(mensch, kennung) ON DELETE CASCADE ON UPDATE CASCADE
+);
+ALTER TABLE zugriff ENABLE ROW LEVEL SECURITY;
+ALTER TABLE zugriff FORCE ROW LEVEL SECURITY;
+CREATE POLICY nur_eigene ON zugriff USING (
+  mensch::text = current_setting('ota.mensch', true)
+  OR current_setting('ota.system', true) = 'an');

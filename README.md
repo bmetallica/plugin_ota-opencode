@@ -10,6 +10,8 @@ die Erinnerungen unter **Mein Konto → Gedächtnis** und im Menü **⋯** der K
 - **Jede Sitzung sieht nur ihr eigenes Gedächtnis.** Unteragenten und Forks teilen das ihrer
   Wurzelsitzung. Welche Sitzung es ist, setzt OTAs opencode-Plugin `ota-sitzung` ein, nicht das
   Modell.
+- **Zugriff auf andere Sitzungen**, vom Menschen in der Ansicht vergeben: Sitzung B liest dann
+  das Gedächtnis von Sitzung A mit, nur lesend. So geht es mit dem Wissen aus A in B weiter.
 - **Überdauert**, wenn opencode einen langen Verlauf zusammenfasst, und wenn die Sitzung Tage
   später fortgesetzt wird (`opencode -c`).
 - **Fünf Werkzeuge über MCP**, knapp beschrieben für lokale Modelle: `memory_recall`,

@@ -1,5 +1,10 @@
 """Speichern, Suchen, Ändern — immer für einen Menschen und eine Sitzung.
 
+Eine Sitzung kann zusätzlich das Gedächtnis anderer Sitzungen **lesen**,
+wenn der Mensch es in der Ansicht so einstellt (Tabelle `zugriff`).
+Suchen und Abrufen sehen diese Einträge mit Herkunft; Speichern, Ändern
+und Löschen wirken nur auf die eigene Sitzung.
+
 Die Werkzeuge (mcp_dienst.py) und die Ansicht (ansicht.py) rufen nur hier
 hinein. Jede Funktion öffnet ihre Transaktion mit `db.verbindung(mensch)`;
 die Datenbank lässt dann nur dessen Zeilen durch. Die Sitzung trennt dieses
@@ -100,6 +105,60 @@ def alles_loeschen(mensch: str) -> int:
     return n
 
 
+def zugriffe(mensch: str, sitzung: str) -> list[dict[str, Any]]:
+    """Die Sitzungen, deren Gedächtnis `sitzung` mitliest."""
+    with verbindung(mensch) as conn:
+        return conn.execute(
+            "SELECT s.kennung, s.titel, s.eigener_titel, s.arbeitsplatz_name, z.angelegt FROM zugriff z "
+            "JOIN sitzung s ON s.mensch = z.mensch AND s.kennung = z.quelle "
+            "WHERE z.mensch = %s AND z.sitzung = %s ORDER BY z.angelegt", (mensch, sitzung)).fetchall()
+
+
+def gelesen_von(mensch: str, quelle: str) -> list[dict[str, Any]]:
+    """Die Sitzungen, die das Gedächtnis von `quelle` mitlesen."""
+    with verbindung(mensch) as conn:
+        return conn.execute(
+            "SELECT s.kennung, s.titel, s.eigener_titel FROM zugriff z "
+            "JOIN sitzung s ON s.mensch = z.mensch AND s.kennung = z.sitzung "
+            "WHERE z.mensch = %s AND z.quelle = %s ORDER BY z.angelegt", (mensch, quelle)).fetchall()
+
+
+def zugriff_geben(mensch: str, sitzung: str, quelle: str) -> None:
+    if sitzung == quelle:
+        raise Abgelehnt("Eine Sitzung sieht ihr eigenes Gedächtnis ohnehin.")
+    with verbindung(mensch) as conn:
+        da = conn.execute("SELECT count(*) AS n FROM sitzung WHERE mensch = %s AND kennung = ANY(%s)",
+                          (mensch, [sitzung, quelle])).fetchone()["n"]
+        if da != 2:
+            raise Abgelehnt("Diese Sitzung gibt es nicht.")
+        conn.execute("INSERT INTO zugriff (mensch, sitzung, quelle) VALUES (%s, %s, %s) "
+                     "ON CONFLICT DO NOTHING", (mensch, sitzung, quelle))
+        _protokoll(conn, mensch, "zugriff_gegeben", sitzung)
+
+
+def zugriff_nehmen(mensch: str, sitzung: str, quelle: str) -> None:
+    with verbindung(mensch) as conn:
+        conn.execute("DELETE FROM zugriff WHERE mensch = %s AND sitzung = %s AND quelle = %s",
+                     (mensch, sitzung, quelle))
+        _protokoll(conn, mensch, "zugriff_genommen", sitzung)
+
+
+def _sichtbar(conn, mensch: str, sitzung: str) -> tuple[list[str], dict[str, str]]:
+    """Die eigene Sitzung und die, auf die sie Zugriff hat — dazu deren
+    Anzeigenamen für die Herkunft."""
+    fremde = conn.execute(
+        "SELECT s.kennung, coalesce(s.eigener_titel, nullif(s.titel, ''), s.kennung) AS name "
+        "FROM zugriff z JOIN sitzung s ON s.mensch = z.mensch AND s.kennung = z.quelle "
+        "WHERE z.mensch = %s AND z.sitzung = %s", (mensch, sitzung)).fetchall()
+    return [sitzung, *(f["kennung"] for f in fremde)], {f["kennung"]: f["name"] for f in fremde}
+
+
+def _herkunft(zeilen: list[dict[str, Any]], namen: dict[str, str]) -> list[dict[str, Any]]:
+    for e in zeilen:
+        e["herkunft"] = namen.get(e["sitzung"], "")
+    return zeilen
+
+
 # --------------------------------------------------------------------------
 # Einträge
 # --------------------------------------------------------------------------
@@ -119,6 +178,12 @@ def _finden(conn, mensch: str, sitzung: str | None, kennung: str) -> dict[str, A
         sql += " AND sitzung = %s"
         werte.append(sitzung)
     treffer = conn.execute(sql + " LIMIT 2", werte).fetchall()
+    if not treffer and sitzung is not None:
+        sicht, _ = _sichtbar(conn, mensch, sitzung)
+        if conn.execute("SELECT 1 FROM eintrag WHERE mensch = %s AND sitzung = ANY(%s) "
+                        "AND replace(id::text, '-', '') LIKE %s", (mensch, sicht[1:], k + "%")).fetchone():
+            raise Abgelehnt(f"[{kennung}] gehört zu einer anderen Sitzung und ist hier nur lesbar. "
+                            "Speichere stattdessen einen eigenen Eintrag.")
     if not treffer:
         raise Abgelehnt(f"Keinen Eintrag [{kennung}] gefunden.")
     if len(treffer) > 1:
@@ -324,28 +389,29 @@ def suchen(mensch: str, sitzung: str, anfrage: str, grenze: int = 10) -> list[di
     rang: dict[Any, float] = {}
     zeilen: dict[Any, dict[str, Any]] = {}
     with verbindung(mensch) as conn:
+        sicht, namen = _sichtbar(conn, mensch, sitzung)
         q = _tsquery(anfrage)
         if q:
             for i, e in enumerate(conn.execute(
                     "SELECT e.*, ts_rank(e.such_text, q.query) AS r FROM eintrag e "
                     "CROSS JOIN (SELECT to_tsquery('german', %s) || to_tsquery('simple', %s) AS query) q "
-                    "WHERE e.mensch = %s AND e.sitzung = %s AND (e.such_text @@ q.query "
+                    "WHERE e.mensch = %s AND e.sitzung = ANY(%s) AND (e.such_text @@ q.query "
                     "  OR %s = ANY(e.schlagworte)) ORDER BY r DESC LIMIT 30",
-                    (q, q, mensch, sitzung, anfrage.lower())).fetchall()):
+                    (q, q, mensch, sicht, anfrage.lower())).fetchall()):
                 rang[e["id"]] = rang.get(e["id"], 0) + 1 / (60 + i)
                 zeilen[e["id"]] = e
         vektor = einbettung.einbetten([anfrage], zeitlimit=5.0, suche=True) if anfrage else None
         if vektor:
             v = einbettung.als_text(vektor[0])
             for i, e in enumerate(conn.execute(
-                    "SELECT * FROM eintrag WHERE mensch = %s AND sitzung = %s AND modell = %s "
+                    "SELECT * FROM eintrag WHERE mensch = %s AND sitzung = ANY(%s) AND modell = %s "
                     "AND einbettung IS NOT NULL ORDER BY einbettung <=> %s::vector LIMIT 30",
-                    (mensch, sitzung, einbettung.modell(), v)).fetchall()):
+                    (mensch, sicht, einbettung.modell(), v)).fetchall()):
                 rang[e["id"]] = rang.get(e["id"], 0) + 1 / (60 + i)
                 zeilen[e["id"]] = e
     j = jetzt()
     reihe = sorted(rang, key=lambda k: rang[k] * _gewicht(zeilen[k], j), reverse=True)
-    return [zeilen[k] for k in reihe[:grenze]]
+    return _herkunft([zeilen[k] for k in reihe[:grenze]], namen)
 
 
 def abrufen(mensch: str, sitzung: str, anfrage: str = "", budget: int = 800,
@@ -354,10 +420,13 @@ def abrufen(mensch: str, sitzung: str, anfrage: str = "", budget: int = 800,
     bis das Budget (grob 4 Zeichen je Token) erschöpft ist."""
     zeichen = max(200, min(int(budget or 800), 8000)) * 4
     with verbindung(mensch) as conn:
-        alle = conn.execute(
-            "SELECT * FROM eintrag WHERE mensch = %s AND sitzung = %s", (mensch, sitzung)).fetchall()
+        sicht, namen = _sichtbar(conn, mensch, sitzung)
+        alle = _herkunft(conn.execute(
+            "SELECT * FROM eintrag WHERE mensch = %s AND sitzung = ANY(%s)", (mensch, sicht)).fetchall(), namen)
     j = jetzt()
-    angeheftet = sorted((e for e in alle if e["angeheftet"]), key=lambda e: e["geaendert"], reverse=True)
+    # Angeheftet: erst die eigenen, dann die aus anderen Sitzungen.
+    angeheftet = sorted((e for e in alle if e["angeheftet"]),
+                        key=lambda e: (e["sitzung"] == sitzung, e["geaendert"]), reverse=True)
     passend = suchen(mensch, sitzung, anfrage, 30) if anfrage else []
     rest = sorted(alle, key=lambda e: _gewicht(e, j) * e["geaendert"].timestamp(), reverse=True)
     raus, gesehen, laenge = [], set(), 0
@@ -383,4 +452,6 @@ def zeile_fuer(e: dict[str, Any]) -> str:
     """Eine Zeile je Eintrag: wenig Tokens, alles Nötige."""
     datum = e["geaendert"].strftime("%Y-%m-%d")
     marke = ", angeheftet" if e.get("angeheftet") else ""
+    if e.get("herkunft"):
+        marke += f', from session "{e["herkunft"]}", read-only'
     return f"[{kurz(e['id'])}] ({e['art']}, {datum}{marke}) {e['inhalt']}"

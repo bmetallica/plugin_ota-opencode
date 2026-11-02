@@ -57,6 +57,37 @@
       </div>
     </header>
 
+    <section class="zugriff">
+      <h3>{{ t.zugriff }}</h3>
+      <p class="leise">{{ t.zugriff_hinweis }}</p>
+      {% if zugriffe %}
+      <ul>
+        {% for z in zugriffe %}
+        <li><a href="{{ query(s=z.kennung) }}">{{ z.eigener_titel or z.titel or z.kennung }}</a>
+          <span class="leise">{{ z.arbeitsplatz_name }}</span>
+          <button class="klein gefahr" data-zugriff-nehmen="{{ z.kennung }}">{{ t.zugriff_nehmen }}</button></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="leise">{{ t.zugriff_keiner }}</p>{% endif %}
+      {% set moeglich = alle | rejectattr("kennung", "equalto", aktuell.kennung) | list %}
+      {% if moeglich %}
+      <form class="inline" data-aktion="zugriff_geben">
+        <select name="quelle" aria-label="{{ t.zugriff_waehlen }}" required>
+          <option value="">{{ t.zugriff_waehlen }}</option>
+          {% for s in moeglich if s.kennung not in (zugriffe | map(attribute="kennung") | list) %}
+            <option value="{{ s.kennung }}">{{ s.eigener_titel or s.titel or s.kennung }} — {{ s.arbeitsplatz_name }} ({{ s.anzahl }})</option>
+          {% endfor %}
+        </select>
+        <button>{{ t.zugriff_geben }}</button>
+      </form>
+      {% endif %}
+      <p class="leise">{{ t.zugriff_neu_hinweis }}</p>
+      {% if gelesen_von %}
+      <p class="leise">{{ t.gelesen_von }}:
+        {% for g in gelesen_von %}<a href="{{ query(s=g.kennung) }}">{{ g.eigener_titel or g.titel or g.kennung }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+    </section>
+
     <details class="vorschau">
       <summary>{{ t.vorschau }}</summary>
       {% if vorschau %}<pre>{% for z in vorschau %}{{ z }}
