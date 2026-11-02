@@ -48,7 +48,9 @@ services:
       POSTGRES_PASSWORD: "${GEDAECHTNIS_DB_PW:?setup.sh ausführen}"
       POSTGRES_DB: gedaechtnis
     volumes:
-      - daten:/var/lib/postgresql/data
+      # Ein Verzeichnis statt des Volumes, wenn GEDAECHTNIS_DB_DIR gesetzt
+      # ist — etwa auf einer SSD. Umziehen: scripts/daten-umziehen.sh in OTA.
+      - ${GEDAECHTNIS_DB_DIR:-daten}:/var/lib/postgresql/data
     networks:
       - intern
     healthcheck:

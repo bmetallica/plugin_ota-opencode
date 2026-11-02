@@ -70,6 +70,10 @@ docker restart ota-gedaechtnis
 **Removing:** unpair in OTA, then `docker compose down`; only
 `docker volume rm ota_gedaechtnis_daten` deletes the data.
 
+**Database location:** by default the volume `ota_gedaechtnis_daten`. OTA's script moves it to an
+SSD while running: `sudo scripts/daten-umziehen.sh --gedaechtnis /ssd/ota/gedaechtnis` (OTA manual,
+chapter 40). It sets `GEDAECHTNIS_DB_DIR` in this `.env`.
+
 **Network:** service and database are in an internal network with a fixed range
 (`GEDAECHTNIS_NETZ`, default `10.98.254.0/28`). Otherwise Docker would at some point hand out
 192.168.x, which can cover the LAN where the embedding server is.

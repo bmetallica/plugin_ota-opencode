@@ -72,6 +72,10 @@ docker restart ota-gedaechtnis
 **Entfernen:** in OTA entkoppeln, dann `docker compose down`; erst
 `docker volume rm ota_gedaechtnis_daten` löscht die Daten.
 
+**Ort der Datenbank:** Standard ist das Volume `ota_gedaechtnis_daten`. Auf eine SSD zieht sie
+OTAs Skript im laufenden Betrieb um: `sudo scripts/daten-umziehen.sh --gedaechtnis /ssd/ota/gedaechtnis`
+(OTA-Handbuch, Kapitel 40). Es trägt `GEDAECHTNIS_DB_DIR` hier in `.env` ein.
+
 **Netz:** Dienst und Datenbank hängen in einem internen Netz mit festem Bereich
 (`GEDAECHTNIS_NETZ`, Vorgabe `10.98.254.0/28`). Docker vergäbe sonst irgendwann 192.168.x, und das
 kann das LAN überdecken, in dem der Embedding-Server steht.
