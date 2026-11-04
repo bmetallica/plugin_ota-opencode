@@ -5,7 +5,7 @@
 A long-term memory for [opencode](https://opencode.ai), **per opencode session**, as a standalone
 Docker application next to [OpenTerminalApps (OTA)](https://github.com/bmetallica/openterminalapps).
 OTA pairs it, turns it on for groups, gives every workspace its own token and shows the memories
-under **My account → Memory** and in a workspace tile's **⋯** menu.
+under **opencode · Memories** in the sidebar and in a workspace tile's **⋯** menu.
 
 - **Every session sees only its own memory.** Subagents and forks share that of their root session.
   OTA's opencode plugin `ota-sitzung` fills in the session, not the model.

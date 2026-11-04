@@ -5,7 +5,7 @@
 Ein Langzeitgedächtnis für [opencode](https://opencode.ai), **je opencode-Sitzung**, als
 eigenständige Docker-Anwendung neben [OpenTerminalApps (OTA)](https://github.com/bmetallica/openterminalapps).
 OTA koppelt sie, schaltet sie für Gruppen ein, gibt jedem Arbeitsplatz ein eigenes Token und zeigt
-die Erinnerungen unter **Mein Konto → Gedächtnis** und im Menü **⋯** der Kachel eines Arbeitsplatzes.
+die Erinnerungen unter **opencode · Erinnerungen** in der Seitenleiste und im Menü **⋯** der Kachel eines Arbeitsplatzes.
 
 - **Jede Sitzung sieht nur ihr eigenes Gedächtnis.** Unteragenten und Forks teilen das ihrer
   Wurzelsitzung. Welche Sitzung es ist, setzt OTAs opencode-Plugin `ota-sitzung` ein, nicht das
