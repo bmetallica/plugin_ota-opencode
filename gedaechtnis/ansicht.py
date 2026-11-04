@@ -8,6 +8,7 @@ setzen (Schutz gegen CSRF, zusätzlich zum SameSite-Cookie von OTA).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from datetime import datetime
@@ -28,6 +29,11 @@ DOKUMENTE = "_dokumente"
 _jinja = Environment(loader=FileSystemLoader(Path(__file__).parent / "vorlagen"),
                      autoescape=select_autoescape(["html"]))
 _STATISCH = Path(__file__).parent / "statisch"
+# Die Fassung von CSS und Skript in ihrer Adresse: Sonst nimmt der Browser
+# nach einem Update noch Minuten lang das alte Skript aus seinem Cache, und
+# neue Knöpfe tun nichts (so geschehen am 2026-11-04 beim Hochladen).
+FASSUNG = hashlib.sha256(
+    b"".join((_STATISCH / n).read_bytes() for n in ("ansicht.css", "ansicht.js"))).hexdigest()[:10]
 
 
 def _betrachter(request: Request) -> zugang.Betrachter:
@@ -98,7 +104,7 @@ def _gemeinsam(request: Request, t: dict[str, str], sprache: str, b: zugang.Betr
         gewaehlt=request.query_params.get("s") or "", ablauf=einstellungen.werte()["ablauf_tage"],
         arbeitsplatz=arbeitsplatz, name=b.name, kurz=speicher.kurz,
         basis="../" if arbeitsplatz is not None else "",
-        query=lambda **k: _query(request, **k), datum=_datum, mb=_mb)
+        query=lambda **k: _query(request, **k), datum=_datum, mb=_mb, fassung=FASSUNG)
 
 
 def _mb(n: int) -> str:
@@ -139,7 +145,7 @@ def statisch(name: str) -> Response:
         raise HTTPException(404)
     art = "text/css" if name.endswith(".css") else "text/javascript"
     return Response((_STATISCH / name).read_bytes(), media_type=art,
-                    headers={"Cache-Control": "max-age=300"})
+                    headers={"Cache-Control": "max-age=86400"})
 
 
 @router.post("/aktion")

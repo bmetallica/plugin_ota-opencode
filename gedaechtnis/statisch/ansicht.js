@@ -125,13 +125,17 @@ document.addEventListener("DOMContentLoaded", () => {
     location.reload();
   }
   datei?.addEventListener("change", () => { if (datei.files.length) hochladen([...datei.files]); });
-  ablage?.addEventListener("dragover", (ev) => { ev.preventDefault(); ablage.classList.add("ueber"); });
-  ablage?.addEventListener("dragleave", () => ablage.classList.remove("ueber"));
-  ablage?.addEventListener("drop", (ev) => {
-    ev.preventDefault();
-    ablage.classList.remove("ueber");
-    if (ev.dataTransfer.files.length) hochladen([...ev.dataTransfer.files]);
-  });
+  // Fallen lassen auf der ganzen Seite der Bibliothek, nicht nur auf der
+  // Fläche — daneben öffnete der Browser sonst die Datei selbst.
+  if (ablage) {
+    document.addEventListener("dragover", (ev) => { ev.preventDefault(); ablage.classList.add("ueber"); });
+    document.addEventListener("dragleave", (ev) => { if (!ev.relatedTarget) ablage.classList.remove("ueber"); });
+    document.addEventListener("drop", (ev) => {
+      ev.preventDefault();
+      ablage.classList.remove("ueber");
+      if (ev.dataTransfer?.files.length) hochladen([...ev.dataTransfer.files]);
+    });
+  }
   document.querySelectorAll(".dokument").forEach((li) => {
     li.querySelector("[data-fuer-alle]")?.addEventListener("change", (ev) => {
       senden({ was: "dokument_fuer_alle", id: li.dataset.id, wert: ev.currentTarget.checked });
