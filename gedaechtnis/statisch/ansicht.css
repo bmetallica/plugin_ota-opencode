@@ -74,3 +74,8 @@ pre { white-space: pre-wrap; margin: 8px 0 0; color: var(--label); }
 .zugriff ul { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; }
 .zugriff li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .zugriff a { color: var(--accent); }
+.ablage { display: block; margin: 12px 0; padding: 22px; border: 2px dashed var(--edge); border-radius: 10px;
+  text-align: center; color: var(--mute); cursor: pointer; }
+.ablage:hover, .ablage.ueber { border-color: var(--accent); color: var(--text); }
+.dokument .name { font-weight: 600; overflow-wrap: anywhere; }
+.marke.fehler, .inhalt.fehler { color: var(--halt); }

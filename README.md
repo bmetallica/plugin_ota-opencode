@@ -16,8 +16,12 @@ die Erinnerungen unter **opencode · Erinnerungen** in der Seitenleiste und im M
   OTA; opencode liest es nur. Angeheftetes kommt bei jedem Abruf mit, der Rest über die Suche.
 - **Überdauert**, wenn opencode einen langen Verlauf zusammenfasst, und wenn die Sitzung Tage
   später fortgesetzt wird (`opencode -c`).
-- **Fünf Werkzeuge über MCP**, knapp beschrieben für lokale Modelle: `memory_recall`,
-  `memory_search`, `memory_save`, `memory_update`, `memory_forget`.
+- **Dokumente** je Mensch (PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, HTML, TXT, MD, CSV …), je Sitzung
+  oder für alle freigegeben. opencode durchsucht sie und nennt die Quelle. Zugangsdaten im Text
+  werden beim Auslesen entfernt.
+- **Sieben Werkzeuge über MCP**, knapp beschrieben für lokale Modelle: `memory_recall`,
+  `memory_search`, `memory_save`, `memory_update`, `memory_forget`, `document_search`,
+  `document_list`.
 - **Suche**: Wortsuche, auf Wunsch zusammen mit Embeddings von einem OpenAI-kompatiblen Server
   (vLLM, llama.cpp, auch hinter llama-swap). Präfixe für Modelle wie nomic-embed-text sind
   einstellbar.
@@ -90,7 +94,9 @@ gedaechtnis/
   mcp_dienst.py     die Werkzeuge (offizielles MCP-SDK, Streamable HTTP, zustandslos)
   ota.py            der Vertrag mit OTA (Schnittstelle 1)
   zugang.py         Tokens der Arbeitsplätze, Signaturen von OTA
-  speicher.py       Speichern, Suchen, Ändern; Trennung je Sitzung
+  speicher.py       Speichern, Suchen, Ändern; Trennung je Sitzung; Hauptgedächtnis
+  dokumente.py      Dokumente: Bibliothek, Freigaben, Verarbeitung, Suche
+  auslesen.py       Text aus Dateien, im eigenen Prozess mit Grenzen
   einbettung.py     Embeddings (OpenAI-kompatibel)
   filter.py         was nicht hinein darf
   pflege.py         nächtlich: Ablauf, Nachholen der Embeddings

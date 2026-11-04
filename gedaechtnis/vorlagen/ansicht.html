@@ -25,6 +25,10 @@
           <span class="name">{{ t.haupt }}</span>
           <span class="leise">{{ t.haupt_kurz }} · {{ haupt_anzahl }} {{ t.eintraege }}</span>
         </a></li>
+        <li><a href="{{ query(s=dok_kennung) }}" {% if bibliothek %}aria-current="page"{% endif %}>
+          <span class="name">{{ t.dokumente }}</span>
+          <span class="leise">{{ t.dokumente_kurz }} · {{ dok_anzahl }}</span>
+        </a></li>
       </ul>
       {% if not gruppen %}<p class="leise">{{ t.leer }}</p>{% endif %}
     {% endif %}
@@ -44,6 +48,44 @@
       <button class="gefahr klein" data-aktion="alles_loeschen" data-frage="{{ t.alles_loeschen_frage }}">{{ t.alles_loeschen }}</button>
     {% endif %}
   </nav>
+
+  {% if bibliothek %}
+  <main class="sitzung bibliothek"{% if dokumente | selectattr("status", "in", ["wartet", "liest"]) | list %} data-verarbeitung{% endif %}>
+    <header>
+      <h2>{{ t.dokumente }}</h2>
+      <p class="leise">{{ t.dokumente_hinweis }}</p>
+      <p class="leise">{{ t.belegt.format(belegt=mb(dok_stand.belegt), grenze=mb(dok_stand.grenze), datei=mb(dok_stand.datei_grenze)) }}</p>
+    </header>
+    <label class="ablage" data-ablage>
+      <input type="file" id="hochladen" multiple hidden
+        accept=".pdf,.docx,.xlsx,.pptx,.odt,.ods,.odp,.html,.htm,.txt,.md,.csv,.tsv,.json,.xml,.yaml,.yml,.log,.rst,.ini,.toml">
+      <span>{{ t.dokument_ablegen }}</span>
+    </label>
+    {% if dokumente %}
+    <ul class="eintraege">
+      {% for d in dokumente %}
+      <li class="eintrag dokument" data-id="{{ d.id }}">
+        <div class="zeile">
+          <a class="name" href="{{ basis }}dokument/{{ d.id }}">{{ d.name }}</a>
+          <span class="art">{{ d.typ }}</span>
+          <span class="marke{% if d.status == 'fehler' %} fehler{% endif %}">{{ t['status_' ~ d.status] }}</span>
+          <span class="leise">{{ mb(d.groesse) }} · {{ datum(d.angelegt) }}{% if d.status == 'fertig' %} · {{ t.abschnitte_n.format(n=d.abschnitte) }}{% endif %}</span>
+          <span class="rechts">
+            <label class="klein"><input type="checkbox" data-fuer-alle {% if d.fuer_alle %}checked{% endif %}> {{ t.fuer_alle }}</label>
+            <button class="klein gefahr" data-dok-loeschen data-frage="{{ t.dokument_loeschen_frage }}">{{ t.loeschen }}</button>
+          </span>
+        </div>
+        {% if d.fehler %}<p class="inhalt fehler">{{ d.fehler }}</p>{% endif %}
+        <p class="leise">
+          {% if d.fuer_alle %}{{ t.fuer_alle_hinweis }}{% elif d.freigaben %}{{ t.freigaben_n.format(n=d.freigaben) }}{% else %}{{ t.freigaben_keine }}{% endif %}
+          {% if d.geschwaerzt %} · {{ t.geschwaerzt_n.format(n=d.geschwaerzt) }}{% endif %}
+        </p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="leise">{{ t.keine_dokumente }}</p>{% endif %}
+  </main>
+  {% endif %}
 
   {% if aktuell %}
   <main class="sitzung" data-sitzung="{{ aktuell.kennung }}">
@@ -109,6 +151,22 @@
         {% for g in gelesen_von %}<a href="{{ query(s=g.kennung) }}">{{ g.eigener_titel or g.titel or g.kennung }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
       {% endif %}
     </section>
+
+    {% if sitzung_dokumente %}
+    <section class="zugriff">
+      <h3>{{ t.sitzung_dokumente }}</h3>
+      <p class="leise">{{ t.sitzung_dokumente_hinweis }}</p>
+      <ul>
+        {% for d in sitzung_dokumente %}
+        <li><label><input type="checkbox" data-freigabe="{{ d.id }}"
+              {% if d.fuer_alle or (d.id | string) in frei %}checked{% endif %}
+              {% if d.fuer_alle %}disabled title="{{ t.fuer_alle_hinweis }}"{% endif %}>
+            {{ d.name }}</label>
+          <span class="leise">{% if d.fuer_alle %}{{ t.fuer_alle }}{% elif d.status != 'fertig' %}{{ t['status_' ~ d.status] }}{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
     {% endif %}
 
     <details class="vorschau">

@@ -74,6 +74,34 @@ TEXTE = {
                          "Das Hauptgedächtnis läuft nicht ab.",
         "haupt_vorschau": "Was jede Sitzung beim Abruf davon bekommt (nur Angeheftetes)",
         "haupt_vorschau_leer": "Nichts angeheftet — opencode findet die Einträge nur über die Suche.",
+        "dokumente": "Dokumente",
+        "dokumente_kurz": "Bibliothek",
+        "dokumente_hinweis": "Lade Dokumente hoch und gib sie Sitzungen frei — einzeln auf der Seite "
+                             "einer Sitzung oder hier für alle. opencode sucht darin mit document_search "
+                             "und nennt die Quelle. Zugangsdaten im Text werden beim Auslesen entfernt. "
+                             "Gescannte PDFs ohne Textschicht gehen nicht.",
+        "belegt": "{belegt} von {grenze} belegt, höchstens {datei} je Datei.",
+        "dokument_ablegen": "Dateien hierher ziehen oder klicken — PDF, DOCX, XLSX, PPTX, ODT, ODS, "
+                            "ODP, HTML, TXT, MD, CSV …",
+        "status_wartet": "wartet",
+        "status_liest": "wird ausgelesen",
+        "status_fertig": "durchsuchbar",
+        "status_fehler": "nicht lesbar",
+        "abschnitte_n": "{n} Abschnitte",
+        "fuer_alle": "für alle Sitzungen",
+        "fuer_alle_hinweis": "Alle Sitzungen dürfen darin suchen, auch künftige.",
+        "freigaben_n": "Freigegeben für {n} Sitzung(en).",
+        "freigaben_keine": "Noch keiner Sitzung freigegeben — auf der Seite einer Sitzung anhaken "
+                           "oder „für alle Sitzungen“.",
+        "geschwaerzt_n": "{n} Stelle(n) mit Zugangsdaten entfernt",
+        "dokument_loeschen_frage": "Dieses Dokument löschen? Keine Sitzung findet es danach mehr.",
+        "dokument_geloescht": "Dokument gelöscht.",
+        "dokument_hochgeladen": "{name} hochgeladen — wird ausgelesen.",
+        "dokument_zu_gross": "Zu groß: höchstens {mb} MB je Datei.",
+        "keine_dokumente": "Noch keine Dokumente.",
+        "sitzung_dokumente": "Dokumente für diese Sitzung",
+        "sitzung_dokumente_hinweis": "Angehakte Dokumente durchsucht opencode in dieser Sitzung mit "
+                                     "document_search. Hochladen unter „Dokumente“ in der Liste links.",
     },
     "en": {
         "titel": "Memory",
@@ -148,5 +176,33 @@ TEXTE = {
                          "The main memory does not expire.",
         "haupt_vorschau": "What every session gets from it on recall (pinned entries only)",
         "haupt_vorschau_leer": "Nothing pinned — opencode finds the entries only by searching.",
+        "dokumente": "Documents",
+        "dokumente_kurz": "library",
+        "dokumente_hinweis": "Upload documents and share them with sessions — one by one on a "
+                             "session's page, or here for all. opencode searches them with "
+                             "document_search and names the source. Credentials in the text are "
+                             "removed when reading. Scanned PDFs without a text layer do not work.",
+        "belegt": "{belegt} of {grenze} used, at most {datei} per file.",
+        "dokument_ablegen": "Drop files here or click — PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, HTML, "
+                            "TXT, MD, CSV …",
+        "status_wartet": "waiting",
+        "status_liest": "being read",
+        "status_fertig": "searchable",
+        "status_fehler": "not readable",
+        "abschnitte_n": "{n} passages",
+        "fuer_alle": "for all sessions",
+        "fuer_alle_hinweis": "All sessions may search it, future ones too.",
+        "freigaben_n": "Shared with {n} session(s).",
+        "freigaben_keine": "Not shared with any session yet — tick it on a session's page or "
+                           "choose \"for all sessions\".",
+        "geschwaerzt_n": "{n} place(s) with credentials removed",
+        "dokument_loeschen_frage": "Delete this document? No session will find it afterwards.",
+        "dokument_geloescht": "Document deleted.",
+        "dokument_hochgeladen": "{name} uploaded — being read.",
+        "dokument_zu_gross": "Too large: at most {mb} MB per file.",
+        "keine_dokumente": "No documents yet.",
+        "sitzung_dokumente": "Documents for this session",
+        "sitzung_dokumente_hinweis": "opencode searches the ticked documents in this session with "
+                                     "document_search. Upload under \"Documents\" in the list on the left.",
     },
 }

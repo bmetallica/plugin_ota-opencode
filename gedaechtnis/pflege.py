@@ -2,7 +2,8 @@
 
 * Sitzungen ohne Aktivität seit `ablauf_tage` löschen (0: nie), nie das
   Hauptgedächtnis.
-* Einträge ohne Einbettung nachholen, auch nach einem Modellwechsel.
+* Einträge und Abschnitte von Dokumenten ohne Einbettung nachholen, auch
+  nach einem Modellwechsel.
 * Widerrufene Tokens nach 7 Tagen, das Protokoll nach 180 Tagen löschen.
 
 Läuft unter `system=True`: Pflege geht über alle Menschen.
@@ -16,7 +17,7 @@ from datetime import datetime
 
 from psycopg.types.json import Jsonb
 
-from . import einbettung, einstellungen, speicher
+from . import dokumente, einbettung, einstellungen, speicher
 from .db import verbindung
 
 log = logging.getLogger("gedaechtnis.pflege")
@@ -51,6 +52,9 @@ def einmal() -> dict[str, int]:
                     conn.execute("UPDATE eintrag SET einbettung = %s::vector, modell = %s WHERE id = %s",
                                  (einbettung.als_text(v), modell, e["id"]))
             erg["eingebettet"] += len(offen)
+        # Dasselbe für die Abschnitte der Dokumente.
+        while (n := dokumente.nachholen_einbettung(modell)):
+            erg["eingebettet"] += n
     with verbindung(system=True) as conn:
         conn.execute("INSERT INTO einstellung (schluessel, wert) VALUES ('pflege_zuletzt', %s) "
                      "ON CONFLICT (schluessel) DO UPDATE SET wert = EXCLUDED.wert",
@@ -82,7 +86,9 @@ async def schleife() -> None:
 
 def _nachholen() -> None:
     with verbindung(system=True) as conn:
-        offen = conn.execute("SELECT count(*) AS n FROM eintrag WHERE modell IS DISTINCT FROM %s",
-                             (einbettung.modell(),)).fetchone()["n"]
+        offen = conn.execute(
+            "SELECT (SELECT count(*) FROM eintrag WHERE modell IS DISTINCT FROM %s) "
+            "+ (SELECT count(*) FROM dokument_abschnitt WHERE modell IS DISTINCT FROM %s) AS n",
+            (einbettung.modell(), einbettung.modell())).fetchone()["n"]
     if offen:
         einmal()

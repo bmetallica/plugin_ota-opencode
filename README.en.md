@@ -15,8 +15,11 @@ under **opencode · Memories** in the sidebar and in a workspace tile's **⋯** 
   it in OTA; opencode only reads it. Pinned entries come with every recall, the rest via search.
 - **Survives** opencode summarising a long history and the session being continued days later
   (`opencode -c`).
-- **Five tools over MCP**, briefly described for local models: `memory_recall`, `memory_search`,
-  `memory_save`, `memory_update`, `memory_forget`.
+- **Documents** per person (PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, HTML, TXT, MD, CSV …), shared per
+  session or with all. opencode searches them and names the source. Credentials in the text are
+  removed when reading.
+- **Seven tools over MCP**, briefly described for local models: `memory_recall`, `memory_search`,
+  `memory_save`, `memory_update`, `memory_forget`, `document_search`, `document_list`.
 - **Search**: word search, optionally together with embeddings from an OpenAI-compatible server
   (vLLM, llama.cpp, also behind llama-swap). Prefixes for models like nomic-embed-text can be set.
 - **Privacy**:
@@ -88,7 +91,9 @@ gedaechtnis/
   mcp_dienst.py     the tools (official MCP SDK, Streamable HTTP, stateless)
   ota.py            the contract with OTA (interface 1)
   zugang.py         workspace tokens, OTA's signatures
-  speicher.py       saving, searching, changing; separation per session
+  speicher.py       saving, searching, changing; separation per session; main memory
+  dokumente.py      documents: library, sharing, processing, search
+  auslesen.py       text from files, in a separate process with limits
   einbettung.py     embeddings (OpenAI-compatible)
   filter.py         what must not go in
   pflege.py         nightly: expiry, catching up on embeddings

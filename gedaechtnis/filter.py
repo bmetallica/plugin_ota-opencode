@@ -47,3 +47,27 @@ def geheimnis(text: str) -> str | None:
         if _entropie(wort) > 4.3 and re.search(r"[A-Z]", wort) and re.search(r"[0-9]", wort):
             return "zufälliger Schlüssel"
     return None
+
+
+SCHWARZ = "[entfernt]"
+
+
+def schwaerzen(text: str) -> tuple[str, int]:
+    """Für Dokumente: Zugangsdaten durch [entfernt] ersetzen, statt das ganze
+    Dokument abzulehnen. Gibt den Text und die Zahl der Stellen zurück."""
+    n = 0
+    for muster, _ in _MUSTER:
+        text, k = muster.subn(SCHWARZ, text)
+        n += k
+
+    def zufall(m: re.Match) -> str:
+        nonlocal n
+        wort = m.group(0)
+        if "/" in wort or re.fullmatch(r"[0-9a-f]+", wort):
+            return wort
+        if _entropie(wort) > 4.3 and re.search(r"[A-Z]", wort) and re.search(r"[0-9]", wort):
+            n += 1
+            return SCHWARZ
+        return wort
+    text = re.sub(r"[A-Za-z0-9+/_=-]{32,}", zufall, text)
+    return text, n

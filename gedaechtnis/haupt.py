@@ -7,10 +7,11 @@ import asyncio
 import contextlib
 import logging
 import os
+import threading
 
 from fastapi import FastAPI
 
-from . import ansicht, db, mcp_dienst, ota, pflege
+from . import ansicht, db, dokumente, mcp_dienst, ota, pflege
 
 logging.basicConfig(level=os.environ.get("GEDAECHTNIS_LOG", "INFO"),
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,6 +23,8 @@ mcp_app = mcp_dienst.asgi_app()
 async def _leben(_: FastAPI):
     await asyncio.to_thread(db.starten)
     aufgabe = asyncio.create_task(pflege.schleife())
+    # Dokumente auslesen: im eigenen Thread, eines nach dem anderen.
+    threading.Thread(target=dokumente.schleife, name="dokumente", daemon=True).start()
     # Der Sitzungsverwalter von MCP braucht seinen eigenen Lebenszyklus.
     async with mcp_dienst.server.session_manager.run():
         yield

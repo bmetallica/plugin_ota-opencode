@@ -125,3 +125,68 @@ ALTER TABLE zugriff FORCE ROW LEVEL SECURITY;
 CREATE POLICY nur_eigene ON zugriff USING (
   mensch::text = current_setting('ota.mensch', true)
   OR current_setting('ota.system', true) = 'an');
+
+-- @abschnitt 3
+-- Dokumente je Mensch: einmal hochgeladen und verarbeitet, je Sitzung
+-- freigegeben oder für alle. Das Original liegt hier, damit es in OTAs
+-- Sicherung ist und mit dem Konto verschwindet.
+CREATE TABLE dokument (
+  id          uuid PRIMARY KEY,
+  mensch      uuid NOT NULL REFERENCES mensch(id) ON DELETE CASCADE,
+  name        text NOT NULL,
+  typ         text NOT NULL,
+  groesse     integer NOT NULL,
+  hash        bytea NOT NULL,
+  original    bytea NOT NULL,
+  -- wartet | liest | fertig | fehler
+  status      text NOT NULL DEFAULT 'wartet',
+  fehler      text,
+  zeichen     integer NOT NULL DEFAULT 0,
+  geschwaerzt integer NOT NULL DEFAULT 0,
+  fuer_alle   boolean NOT NULL DEFAULT false,
+  angelegt    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (mensch, hash)
+);
+CREATE INDEX dokument_status ON dokument (status) WHERE status IN ('wartet', 'liest');
+
+CREATE TABLE dokument_abschnitt (
+  id         bigserial PRIMARY KEY,
+  mensch     uuid NOT NULL,
+  dokument   uuid NOT NULL REFERENCES dokument(id) ON DELETE CASCADE,
+  nummer     integer NOT NULL,
+  quelle     text NOT NULL DEFAULT '',
+  inhalt     text NOT NULL,
+  einbettung vector,
+  modell     text,
+  such_text  tsvector GENERATED ALWAYS AS (
+               to_tsvector('german', inhalt) || to_tsvector('simple', inhalt)
+             ) STORED
+);
+CREATE INDEX dokument_abschnitt_dok ON dokument_abschnitt (dokument, nummer);
+CREATE INDEX dokument_abschnitt_such ON dokument_abschnitt USING gin (such_text);
+CREATE INDEX dokument_abschnitt_offen ON dokument_abschnitt (id) WHERE einbettung IS NULL;
+
+CREATE TABLE dokument_freigabe (
+  mensch   uuid NOT NULL,
+  sitzung  text NOT NULL,
+  dokument uuid NOT NULL REFERENCES dokument(id) ON DELETE CASCADE,
+  angelegt timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (mensch, sitzung, dokument),
+  FOREIGN KEY (mensch, sitzung) REFERENCES sitzung(mensch, kennung) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+ALTER TABLE dokument ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dokument FORCE ROW LEVEL SECURITY;
+ALTER TABLE dokument_abschnitt ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dokument_abschnitt FORCE ROW LEVEL SECURITY;
+ALTER TABLE dokument_freigabe ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dokument_freigabe FORCE ROW LEVEL SECURITY;
+CREATE POLICY nur_eigene ON dokument USING (
+  mensch::text = current_setting('ota.mensch', true)
+  OR current_setting('ota.system', true) = 'an');
+CREATE POLICY nur_eigene ON dokument_abschnitt USING (
+  mensch::text = current_setting('ota.mensch', true)
+  OR current_setting('ota.system', true) = 'an');
+CREATE POLICY nur_eigene ON dokument_freigabe USING (
+  mensch::text = current_setting('ota.mensch', true)
+  OR current_setting('ota.system', true) = 'an');

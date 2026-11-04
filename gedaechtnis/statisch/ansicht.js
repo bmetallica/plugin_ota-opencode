@@ -43,7 +43,11 @@ function formular(f) {
 
 document.addEventListener("DOMContentLoaded", () => {
   const alt = sessionStorage.getItem("gedaechtnis.meldung");
-  if (alt) { melden(alt); sessionStorage.removeItem("gedaechtnis.meldung"); }
+  if (alt) {
+    melden(alt, sessionStorage.getItem("gedaechtnis.fehler") === "1");
+    sessionStorage.removeItem("gedaechtnis.meldung");
+    sessionStorage.removeItem("gedaechtnis.fehler");
+  }
 
   document.querySelectorAll("form[data-aktion]").forEach((f) => {
     f.addEventListener("submit", (ev) => {
@@ -92,6 +96,56 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-zugriff-nehmen]").forEach((b) => {
     b.addEventListener("click", () => senden({ was: "zugriff_nehmen", quelle: b.dataset.zugriffNehmen }))
   })
+
+  // Dokumente: hochladen (eine Datei je Anfrage, der Name in einer Kopfzeile),
+  // „für alle Sitzungen“, Freigabe je Sitzung, löschen.
+  const datei = document.getElementById("hochladen");
+  const ablage = document.querySelector("[data-ablage]");
+  async function hochladen(dateien) {
+    const meldungen = [];
+    let fehler = false;
+    for (const d of dateien) {
+      melden(d.name + " …");
+      try {
+        const r = await fetch(basis + "dokument?sprache=" + sprache, {
+          method: "POST", body: d, credentials: "same-origin",
+          headers: { "X-OTA-Ansicht": "1", "X-Dateiname": encodeURIComponent(d.name),
+                     "Content-Type": "application/octet-stream" },
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) fehler = true;
+        meldungen.push(j.meldung || j.detail || (d.name + ": " + document.body.dataset.fehler));
+      } catch (e) {
+        fehler = true;
+        meldungen.push(d.name + ": " + document.body.dataset.fehler);
+      }
+    }
+    sessionStorage.setItem("gedaechtnis.meldung", meldungen.join(" · "));
+    if (fehler) sessionStorage.setItem("gedaechtnis.fehler", "1");
+    location.reload();
+  }
+  datei?.addEventListener("change", () => { if (datei.files.length) hochladen([...datei.files]); });
+  ablage?.addEventListener("dragover", (ev) => { ev.preventDefault(); ablage.classList.add("ueber"); });
+  ablage?.addEventListener("dragleave", () => ablage.classList.remove("ueber"));
+  ablage?.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    ablage.classList.remove("ueber");
+    if (ev.dataTransfer.files.length) hochladen([...ev.dataTransfer.files]);
+  });
+  document.querySelectorAll(".dokument").forEach((li) => {
+    li.querySelector("[data-fuer-alle]")?.addEventListener("change", (ev) => {
+      senden({ was: "dokument_fuer_alle", id: li.dataset.id, wert: ev.currentTarget.checked });
+    });
+    const weg = li.querySelector("[data-dok-loeschen]");
+    weg?.addEventListener("click", () => {
+      if (confirm(weg.dataset.frage)) senden({ was: "dokument_loeschen", id: li.dataset.id });
+    });
+  });
+  document.querySelectorAll("[data-freigabe]").forEach((k) => {
+    k.addEventListener("change", () => senden({ was: "dokument_freigabe", id: k.dataset.freigabe, wert: k.checked }));
+  });
+  // Solange etwas ausgelesen wird, regelmässig nachsehen.
+  if (document.querySelector("[data-verarbeitung]")) setTimeout(() => location.reload(), 4000);
 
   document.querySelectorAll("[data-sammel]").forEach((b) => {
     b.addEventListener("click", () => {

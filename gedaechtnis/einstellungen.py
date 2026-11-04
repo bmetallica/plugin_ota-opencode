@@ -26,6 +26,8 @@ VORGABEN: dict[str, Any] = {
     "kontingent_mensch": 5000,
     "kontingent_sitzung": 500,
     "speichern_fragen": True,
+    "dokument_mb": 25,
+    "dokument_kontingent_mb": 1024,
 }
 
 # Das JSON-Schema für OTAs Formular (Manifest). Reihenfolge = Anzeige.
@@ -60,6 +62,11 @@ SCHEMA: dict[str, Any] = {
         "speichern_fragen": {
             "type": "boolean", "title": "Vor dem Speichern fragen",
             "description": "opencode fragt bei jedem Speichern um Erlaubnis."},
+        "dokument_mb": {
+            "type": "integer", "minimum": 1, "maximum": 200, "title": "Dokumente: MB je Datei"},
+        "dokument_kontingent_mb": {
+            "type": "integer", "minimum": 10, "maximum": 100000, "title": "Dokumente: MB je Mensch",
+            "description": "Originale und ausgelesener Text zusammen."},
     },
 }
 

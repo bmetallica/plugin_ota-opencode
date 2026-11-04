@@ -9,6 +9,7 @@ setzen (Schutz gegen CSRF, zusätzlich zum SameSite-Cookie von OTA).
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,10 +18,13 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from . import einstellungen, speicher, zugang
+from . import dokumente, einstellungen, speicher, zugang
 from .texte import TEXTE
 
 router = APIRouter(prefix="/ansicht")
+# Die Seite mit der Dokumentenbibliothek, in der Gesamtansicht neben dem
+# Hauptgedächtnis.
+DOKUMENTE = "_dokumente"
 _jinja = Environment(loader=FileSystemLoader(Path(__file__).parent / "vorlagen"),
                      autoescape=select_autoescape(["html"]))
 _STATISCH = Path(__file__).parent / "statisch"
@@ -50,6 +54,11 @@ def _seite(request: Request, b: zugang.Betrachter, arbeitsplatz: str | None) -> 
     gewaehlt = request.query_params.get("s") or (
         liste[0]["kennung"] if liste else (speicher.HAUPT if mit_haupt else ""))
     haupt = gewaehlt == speicher.HAUPT and mit_haupt
+    if gewaehlt == DOKUMENTE and mit_haupt:
+        return _antwort(_jinja.get_template("ansicht.html").render(
+            **_gemeinsam(request, t, sprache, b, liste, arbeitsplatz), bibliothek=True,
+            dokumente=dokumente.liste(b.mensch), dok_stand=dokumente.stand(b.mensch),
+            aktuell=None, haupt=False))
     if haupt:
         aktuell = {"kennung": speicher.HAUPT, "titel": t["haupt"], "eigener_titel": None}
     else:
@@ -63,21 +72,40 @@ def _seite(request: Request, b: zugang.Betrachter, arbeitsplatz: str | None) -> 
     alle = speicher.sitzungen(b.mensch) if aktuell else []
     zugriffe = speicher.zugriffe(b.mensch, aktuell["kennung"]) if aktuell and not haupt else []
     gelesen_von = speicher.gelesen_von(b.mensch, aktuell["kennung"]) if aktuell and not haupt else []
+    # Die Dokumente und welche davon diese Sitzung lesen darf.
+    alle_dok = dokumente.liste(b.mensch) if aktuell and not haupt else []
+    frei = dokumente.freigegeben(b.mensch, aktuell["kennung"]) if alle_dok else set()
+    return _antwort(_jinja.get_template("ansicht.html").render(
+        **_gemeinsam(request, t, sprache, b, liste, arbeitsplatz),
+        aktuell=aktuell, eintraege=eintraege, alle=alle, haupt=haupt,
+        zugriffe=zugriffe, gelesen_von=gelesen_von, sitzung_dokumente=alle_dok, frei=frei,
+        vorschau=[speicher.zeile_fuer(e) for e in vorschau], arten=speicher.ARTEN,
+        laenge=speicher.LAENGE, bibliothek=False))
+
+
+def _gemeinsam(request: Request, t: dict[str, str], sprache: str, b: zugang.Betrachter,
+               liste: list[dict[str, Any]], arbeitsplatz: str | None) -> dict[str, Any]:
+    """Was jede Seite braucht: Liste links, Sprache, Thema, Wege."""
     gruppen: dict[str, list[dict[str, Any]]] = {}
     for s in liste:
         gruppen.setdefault(s["arbeitsplatz_name"] or t["ohne_arbeitsplatz"], []).append(s)
-    w = einstellungen.werte()
-    html = _jinja.get_template("ansicht.html").render(
+    mit_haupt = arbeitsplatz is None
+    return dict(
         t=t, sprache=sprache, thema="hell" if request.query_params.get("thema") == "hell" else "dunkel",
-        gruppen=gruppen, aktuell=aktuell, eintraege=eintraege, alle=alle,
-        haupt=haupt, mit_haupt=mit_haupt, haupt_kennung=speicher.HAUPT,
+        gruppen=gruppen, mit_haupt=mit_haupt, haupt_kennung=speicher.HAUPT, dok_kennung=DOKUMENTE,
         haupt_anzahl=speicher.haupt_anzahl(b.mensch) if mit_haupt else 0,
-        zugriffe=zugriffe, gelesen_von=gelesen_von,
-        vorschau=[speicher.zeile_fuer(e) for e in vorschau], arten=speicher.ARTEN,
+        dok_anzahl=len(dokumente.liste(b.mensch)) if mit_haupt else 0,
+        gewaehlt=request.query_params.get("s") or "", ablauf=einstellungen.werte()["ablauf_tage"],
         arbeitsplatz=arbeitsplatz, name=b.name, kurz=speicher.kurz,
         basis="../" if arbeitsplatz is not None else "",
-        ablauf=w["ablauf_tage"], laenge=speicher.LAENGE,
-        query=lambda **k: _query(request, **k), datum=_datum)
+        query=lambda **k: _query(request, **k), datum=_datum, mb=_mb)
+
+
+def _mb(n: int) -> str:
+    return f"{n / 1048576:.1f} MB" if n >= 104858 else f"{max(1, n // 1024)} KB"
+
+
+def _antwort(html: str) -> HTMLResponse:
     return HTMLResponse(html, headers={
         "Content-Security-Policy": "default-src 'self'; style-src 'self'; script-src 'self'; "
                                    "frame-ancestors 'self'; form-action 'self'",
@@ -162,14 +190,64 @@ async def aktion(request: Request) -> JSONResponse:
         if was == "sitzung_loeschen":
             n = speicher.sitzung_loeschen(b.mensch, s)
             return JSONResponse({"ok": True, "meldung": t["geloescht_n"].format(n=n), "weg": True})
+        if was == "dokument_loeschen":
+            dokumente.loeschen(b.mensch, str(body.get("id") or ""))
+            return JSONResponse({"ok": True, "meldung": t["dokument_geloescht"]})
+        if was == "dokument_fuer_alle":
+            dokumente.fuer_alle(b.mensch, str(body.get("id") or ""), bool(body.get("wert")))
+            return JSONResponse({"ok": True})
+        if was == "dokument_freigabe":
+            dokumente.freigeben(b.mensch, s, str(body.get("id") or ""), bool(body.get("wert")))
+            return JSONResponse({"ok": True})
         if was == "alles_loeschen":
             if str(body.get("bestaetigung") or "").strip() != b.name:
                 return JSONResponse({"ok": False, "meldung": t["bestaetigung_falsch"]}, 400)
+            dokumente.alle_loeschen(b.mensch)
             n = speicher.alles_loeschen(b.mensch)
             return JSONResponse({"ok": True, "meldung": t["geloescht_n"].format(n=n), "weg": True})
     except speicher.Abgelehnt as exc:
         return JSONResponse({"ok": False, "meldung": str(exc)}, 400)
     raise HTTPException(400, "Unbekannte Aktion")
+
+
+@router.post("/dokument")
+async def dokument_hochladen(request: Request) -> JSONResponse:
+    """Eine Datei als Rumpf, der Name in `X-Dateiname` (URL-kodiert). Ohne
+    multipart: eine Abhängigkeit weniger, und gelesen wird nur bis zur Grenze."""
+    b = _betrachter(request)
+    if request.headers.get("x-ota-ansicht") != "1":
+        raise HTTPException(403, "Kopfzeile fehlt")
+    from urllib.parse import unquote
+    t = TEXTE[_sprache(request)]
+    name = unquote(request.headers.get("x-dateiname") or "")
+    grenze = int(einstellungen.werte()["dokument_mb"]) * 1048576
+    daten = bytearray()
+    async for stueck in request.stream():
+        daten += stueck
+        if len(daten) > grenze:
+            return JSONResponse({"ok": False, "meldung": t["dokument_zu_gross"].format(
+                mb=einstellungen.werte()["dokument_mb"])}, 413)
+    try:
+        neu = dokumente.hochladen(b.mensch, name, bytes(daten))
+    except speicher.Abgelehnt as exc:
+        return JSONResponse({"ok": False, "meldung": f"{name}: {exc}"}, 400)
+    return JSONResponse({"ok": True, "meldung": t["dokument_hochgeladen"].format(name=neu["name"])})
+
+
+@router.get("/dokument/{dok}")
+def dokument_holen(dok: str, request: Request) -> Response:
+    b = _betrachter(request)
+    try:
+        uuid_ok = str(uuid.UUID(dok))
+    except ValueError as exc:
+        raise HTTPException(404) from exc
+    d = dokumente.original(b.mensch, uuid_ok)
+    if d is None:
+        raise HTTPException(404)
+    from urllib.parse import quote
+    return Response(bytes(d["original"]), media_type="application/octet-stream",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(d['name'])}",
+                             "X-Content-Type-Options": "nosniff"})
 
 
 @router.get("/export")
