@@ -11,6 +11,8 @@ under **opencode · Memories** in the sidebar and in a workspace tile's **⋯** 
   OTA's opencode plugin `ota-sitzung` fills in the session, not the model.
 - **Access to other sessions**, granted by the person in the view: session B then also reads the
   memory of session A, read-only. That way work continues in B with what A knows.
+- **Main memory** per person: entries all of their sessions read along. Only the person maintains
+  it in OTA; opencode only reads it. Pinned entries come with every recall, the rest via search.
 - **Survives** opencode summarising a long history and the session being continued days later
   (`opencode -c`).
 - **Five tools over MCP**, briefly described for local models: `memory_recall`, `memory_search`,

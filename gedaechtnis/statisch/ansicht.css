@@ -37,6 +37,7 @@ code, pre { font-family: ui-monospace, "IBM Plex Mono", monospace; font-size: 12
 .liste .name { font-weight: 600; overflow-wrap: anywhere; }
 .liste .leise { overflow-wrap: anywhere; }
 .liste > button { margin: 12px 8px 4px; }
+.liste .haupt-link { border-bottom: 1px solid var(--edge); padding-bottom: 6px; margin-bottom: 4px; }
 .sitzung { background: var(--bay); border: 1px solid var(--edge); border-radius: 10px; padding: 14px 16px; min-width: 0; }
 .sitzung h2 { margin: 0 0 8px; font-size: 18px; overflow-wrap: anywhere; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 0 0 10px; font-size: 13px; }

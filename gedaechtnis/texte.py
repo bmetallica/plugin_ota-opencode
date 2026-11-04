@@ -66,6 +66,14 @@ TEXTE = {
         "zugriff_neu_hinweis": "Eine neue Sitzung erscheint hier, sobald opencode darin das "
                                "Gedächtnis einmal benutzt hat (beim ersten Abruf, gleich zu Beginn).",
         "herkunft": "aus",
+        "haupt": "Hauptgedächtnis",
+        "haupt_kurz": "für alle Sitzungen",
+        "haupt_hinweis": "Was hier steht, lesen alle deine opencode-Sitzungen mit, auch künftige. "
+                         "Ändern kannst nur du, hier in OTA; opencode liest es nur. Angeheftetes "
+                         "bekommt jede Sitzung bei jedem Abruf, alles andere findet sie über die Suche. "
+                         "Das Hauptgedächtnis läuft nicht ab.",
+        "haupt_vorschau": "Was jede Sitzung beim Abruf davon bekommt (nur Angeheftetes)",
+        "haupt_vorschau_leer": "Nichts angeheftet — opencode findet die Einträge nur über die Suche.",
     },
     "en": {
         "titel": "Memory",
@@ -132,5 +140,13 @@ TEXTE = {
         "zugriff_neu_hinweis": "A new session appears here as soon as opencode has used the "
                                "memory in it once (at the first recall, right at the start).",
         "herkunft": "from",
+        "haupt": "Main memory",
+        "haupt_kurz": "for all sessions",
+        "haupt_hinweis": "All your opencode sessions read what is here, future ones too. Only you "
+                         "can change it, here in OTA; opencode only reads it. Every session gets "
+                         "pinned entries with every recall and finds everything else by searching. "
+                         "The main memory does not expire.",
+        "haupt_vorschau": "What every session gets from it on recall (pinned entries only)",
+        "haupt_vorschau_leer": "Nothing pinned — opencode finds the entries only by searching.",
     },
 }

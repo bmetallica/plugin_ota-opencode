@@ -383,3 +383,49 @@ def test_zugriff_auf_andere_sitzung(c):
     # Ein anderer Mensch mit gleichen Kennungen sieht nichts davon.
     _, tf = _platz(c, str(uuid.uuid4()), "fremd2")
     assert "Schritt" not in _mcp(c, tf, "memory_recall", ota_sitzung="ses_BB")
+
+
+def test_hauptgedaechtnis(c):
+    m = str(uuid.uuid4())
+    platz, token = _platz(c, m, "frida")
+    _mcp(c, token, "memory_save", content="Sitzung eins arbeitet am Login", ota_sitzung="ses_H1")
+    _mcp(c, token, "memory_save", content="Sitzung zwei baut die Karte", ota_sitzung="ses_H2")
+    kopf = {**_ansicht(m, "frida", [platz]), "X-OTA-Ansicht": "1"}
+    seite = c.get("/ansicht/konto", headers=kopf).text
+    assert "Hauptgedächtnis" in seite and "_haupt" in seite
+    # Nur die Ansicht schreibt hinein — die Sitzungsliste zeigt es nicht als Sitzung.
+    for inhalt, heften in (("Antworte immer auf Deutsch", True), ("Tests laufen mit pytest -x", False)):
+        assert c.post("/ansicht/aktion", headers=kopf, json={
+            "was": "neu", "sitzung": "_haupt", "inhalt": inhalt, "art": "vorliebe"}).json()["ok"]
+        if heften:
+            k = re.findall(r'data-id="([0-9a-f-]+)"', c.get("/ansicht/konto?s=_haupt", headers=kopf).text)[0]
+            assert c.post("/ansicht/aktion", headers=kopf, json={"was": "anheften", "id": k, "wert": True}).json()["ok"]
+    # Jede Sitzung bekommt beim Abruf nur das Angeheftete, findet aber alles über die Suche.
+    for s in ("ses_H1", "ses_H2", "ses_neu"):
+        r = _mcp(c, token, "memory_recall", ota_sitzung=s)
+        assert "auf Deutsch" in r and "main memory, read-only" in r and "pytest" not in r
+        assert "pytest" in _mcp(c, token, "memory_search", query="Wie laufen die Tests pytest", ota_sitzung=s)
+    # opencode ändert es nicht, löscht es nicht und schreibt nicht hinein.
+    k = re.search(r"\[([0-9a-f]{8})\] \([^)]*main memory", _mcp(c, token, "memory_recall", ota_sitzung="ses_H1")).group(1)
+    assert "only the user" in _mcp(c, token, "memory_forget", id=k, ota_sitzung="ses_H1")
+    assert "only the user" in _mcp(c, token, "memory_update", id=k, content="x", ota_sitzung="ses_H1")
+    assert "vergeben" in _mcp(c, token, "memory_save", content="hinein", ota_sitzung="_haupt")
+    assert "auf Deutsch" in _mcp(c, token, "memory_recall", ota_sitzung="ses_H2")
+    # Zugriff darauf vergibt man nicht, und es lässt sich nicht als Sitzung löschen.
+    assert not c.post("/ansicht/aktion", headers=kopf, json={"was": "zugriff_geben", "sitzung": "ses_H1",
+                                                              "quelle": "_haupt"}).json()["ok"]
+    assert not c.post("/ansicht/aktion", headers=kopf, json={"was": "sitzung_loeschen",
+                                                              "sitzung": "_haupt"}).json()["ok"]
+    # Aus einer Sitzung ins Hauptgedächtnis kopieren.
+    s1 = re.findall(r'data-id="([0-9a-f-]+)"', c.get("/ansicht/konto?s=ses_H1", headers=kopf).text)
+    assert c.post("/ansicht/aktion", headers=kopf, json={"was": "kopieren", "ids": s1, "ziel": "_haupt"}).json()["ok"]
+    assert "Login" in _mcp(c, token, "memory_search", query="Login", ota_sitzung="ses_H2")
+    # Die Pflege lässt es stehen, auch wenn es „alt“ ist.
+    from gedaechtnis.db import verbindung
+    with verbindung(system=True) as conn:
+        conn.execute("UPDATE sitzung SET zuletzt_aktiv = now() - interval '400 days' WHERE mensch = %s", (m,))
+    pflege.einmal()
+    assert "auf Deutsch" in _mcp(c, token, "memory_recall", ota_sitzung="ses_x")
+    # Ein anderer Mensch sieht davon nichts.
+    _, tf = _platz(c, str(uuid.uuid4()), "fremd3")
+    assert "Deutsch" not in _mcp(c, tf, "memory_search", query="Deutsch", ota_sitzung="ses_H1")

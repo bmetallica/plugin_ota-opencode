@@ -12,6 +12,8 @@ die Erinnerungen unter **opencode · Erinnerungen** in der Seitenleiste und im M
   Modell.
 - **Zugriff auf andere Sitzungen**, vom Menschen in der Ansicht vergeben: Sitzung B liest dann
   das Gedächtnis von Sitzung A mit, nur lesend. So geht es mit dem Wissen aus A in B weiter.
+- **Hauptgedächtnis** je Mensch: Einträge, die alle seine Sitzungen mitlesen. Nur er pflegt es in
+  OTA; opencode liest es nur. Angeheftetes kommt bei jedem Abruf mit, der Rest über die Suche.
 - **Überdauert**, wenn opencode einen langen Verlauf zusammenfasst, und wenn die Sitzung Tage
   später fortgesetzt wird (`opencode -c`).
 - **Fünf Werkzeuge über MCP**, knapp beschrieben für lokale Modelle: `memory_recall`,

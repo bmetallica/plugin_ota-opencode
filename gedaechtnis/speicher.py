@@ -5,6 +5,11 @@ wenn der Mensch es in der Ansicht so einstellt (Tabelle `zugriff`).
 Suchen und Abrufen sehen diese Einträge mit Herkunft; Speichern, Ändern
 und Löschen wirken nur auf die eigene Sitzung.
 
+Dazu das **Hauptgedächtnis** je Mensch: eine Sitzung mit der festen Kennung
+`HAUPT`, die jede seiner Sitzungen liest. Pflegen kann es nur der Mensch in
+der Ansicht; opencode liest es, ändert es nie. Es läuft nicht ab und steht in
+keiner Liste der Sitzungen.
+
 Die Werkzeuge (mcp_dienst.py) und die Ansicht (ansicht.py) rufen nur hier
 hinein. Jede Funktion öffnet ihre Transaktion mit `db.verbindung(mensch)`;
 die Datenbank lässt dann nur dessen Zeilen durch. Die Sitzung trennt dieses
@@ -27,6 +32,9 @@ ARTEN = ("fakt", "vorliebe", "entscheidung", "ablauf", "stand", "notiz")
 ZEITLOS = ("fakt", "vorliebe")
 LAENGE = 2000
 AEHNLICH = 0.92
+# Die Kennung des Hauptgedächtnisses. opencode vergibt `ses_…`; ein
+# führender Unterstrich kommt dort nicht vor.
+HAUPT = "_haupt"
 
 
 class Abgelehnt(Exception):
@@ -50,6 +58,8 @@ def _protokoll(conn, mensch: str, aktion: str, sitzung: str | None = None,
 def sitzung_merken(mensch: str, kennung: str, titel: str, verzeichnis: str,
                    arbeitsplatz: str | None, arbeitsplatz_name: str) -> None:
     """Legt die Sitzung an oder frischt Titel, Verzeichnis und Aktivität auf."""
+    if kennung.strip() == HAUPT:
+        raise Abgelehnt("Diese Sitzungskennung ist vergeben.")
     with verbindung(mensch) as conn:
         conn.execute(
             "INSERT INTO sitzung (mensch, kennung, titel, verzeichnis, arbeitsplatz, arbeitsplatz_name) "
@@ -66,7 +76,8 @@ def sitzungen(mensch: str, arbeitsplaetze: list[str] | None = None) -> list[dict
     """Die Sitzungen eines Menschen, neueste zuerst; auf Wunsch nur die, die
     zuletzt in einem dieser Arbeitsplätze benutzt wurden."""
     sql = ("SELECT s.*, (SELECT count(*) FROM eintrag e WHERE e.mensch = s.mensch "
-           "AND e.sitzung = s.kennung) AS anzahl FROM sitzung s WHERE s.mensch = %s")
+           "AND e.sitzung = s.kennung) AS anzahl FROM sitzung s WHERE s.mensch = %s "
+           f"AND s.kennung <> '{HAUPT}'")
     werte: list[Any] = [mensch]
     if arbeitsplaetze is not None:
         sql += " AND s.arbeitsplatz = ANY(%s::uuid[])"
@@ -82,6 +93,19 @@ def sitzung(mensch: str, kennung: str) -> dict[str, Any] | None:
                             (mensch, kennung)).fetchone()
 
 
+def haupt_anlegen(mensch: str) -> None:
+    """Das Hauptgedächtnis gibt es, sobald jemand es öffnet."""
+    with verbindung(mensch) as conn:
+        conn.execute("INSERT INTO sitzung (mensch, kennung, titel) VALUES (%s, %s, '') "
+                     "ON CONFLICT DO NOTHING", (mensch, HAUPT))
+
+
+def haupt_anzahl(mensch: str) -> int:
+    with verbindung(mensch) as conn:
+        return conn.execute("SELECT count(*) AS n FROM eintrag WHERE mensch = %s AND sitzung = %s",
+                            (mensch, HAUPT)).fetchone()["n"]
+
+
 def sitzung_umbenennen(mensch: str, kennung: str, titel: str) -> None:
     with verbindung(mensch) as conn:
         conn.execute("UPDATE sitzung SET eigener_titel = %s WHERE mensch = %s AND kennung = %s",
@@ -89,6 +113,8 @@ def sitzung_umbenennen(mensch: str, kennung: str, titel: str) -> None:
 
 
 def sitzung_loeschen(mensch: str, kennung: str) -> int:
+    if kennung == HAUPT:
+        raise Abgelehnt("Das Hauptgedächtnis lässt sich nicht als Sitzung löschen.")
     with verbindung(mensch) as conn:
         n = conn.execute("SELECT count(*) AS n FROM eintrag WHERE mensch = %s AND sitzung = %s",
                          (mensch, kennung)).fetchone()["n"]
@@ -124,6 +150,8 @@ def gelesen_von(mensch: str, quelle: str) -> list[dict[str, Any]]:
 
 
 def zugriff_geben(mensch: str, sitzung: str, quelle: str) -> None:
+    if HAUPT in (sitzung, quelle):
+        raise Abgelehnt("Das Hauptgedächtnis lesen ohnehin alle Sitzungen.")
     if sitzung == quelle:
         raise Abgelehnt("Eine Sitzung sieht ihr eigenes Gedächtnis ohnehin.")
     with verbindung(mensch) as conn:
@@ -144,13 +172,16 @@ def zugriff_nehmen(mensch: str, sitzung: str, quelle: str) -> None:
 
 
 def _sichtbar(conn, mensch: str, sitzung: str) -> tuple[list[str], dict[str, str]]:
-    """Die eigene Sitzung und die, auf die sie Zugriff hat — dazu deren
-    Anzeigenamen für die Herkunft."""
+    """Die eigene Sitzung, die, auf die sie Zugriff hat, und das
+    Hauptgedächtnis — dazu deren Anzeigenamen für die Herkunft."""
     fremde = conn.execute(
         "SELECT s.kennung, coalesce(s.eigener_titel, nullif(s.titel, ''), s.kennung) AS name "
         "FROM zugriff z JOIN sitzung s ON s.mensch = z.mensch AND s.kennung = z.quelle "
         "WHERE z.mensch = %s AND z.sitzung = %s", (mensch, sitzung)).fetchall()
-    return [sitzung, *(f["kennung"] for f in fremde)], {f["kennung"]: f["name"] for f in fremde}
+    namen = {f["kennung"]: f["name"] for f in fremde}
+    if sitzung != HAUPT:
+        namen[HAUPT] = HAUPT
+    return [sitzung, *namen], namen
 
 
 def _herkunft(zeilen: list[dict[str, Any]], namen: dict[str, str]) -> list[dict[str, Any]]:
@@ -179,6 +210,10 @@ def _finden(conn, mensch: str, sitzung: str | None, kennung: str) -> dict[str, A
         werte.append(sitzung)
     treffer = conn.execute(sql + " LIMIT 2", werte).fetchall()
     if not treffer and sitzung is not None:
+        if conn.execute("SELECT 1 FROM eintrag WHERE mensch = %s AND sitzung = %s "
+                        "AND replace(id::text, '-', '') LIKE %s", (mensch, HAUPT, k + "%")).fetchone():
+            raise Abgelehnt(f"[{kennung}] is in the user's main memory, which only the user can "
+                            "change (in OTA). Save a note of your own instead.")
         sicht, _ = _sichtbar(conn, mensch, sitzung)
         if conn.execute("SELECT 1 FROM eintrag WHERE mensch = %s AND sitzung = ANY(%s) "
                         "AND replace(id::text, '-', '') LIKE %s", (mensch, sicht[1:], k + "%")).fetchone():
@@ -219,6 +254,8 @@ def _schlagworte(roh: Any) -> list[str]:
 def speichern(mensch: str, sitzung: str, inhalt: str, art: str, schlagworte: Any = None,
               quelle: str = "werkzeug") -> tuple[str, str]:
     """('neu'|'aktualisiert', Kurzkennung). Sehr Ähnliches wird aktualisiert."""
+    if sitzung == HAUPT and quelle != "ansicht":
+        raise Abgelehnt("The main memory can only be changed by the user in OTA.")
     inhalt, art = _pruefen(inhalt, art)
     worte = _schlagworte(schlagworte)
     vektor = einbettung.einbetten([inhalt])
@@ -256,7 +293,7 @@ def speichern(mensch: str, sitzung: str, inhalt: str, art: str, schlagworte: Any
                             "Erst Überholtes mit memory_forget entfernen.")
         if zahlen["alle"] >= w["kontingent_mensch"]:
             raise Abgelehnt(f"Dein Gedächtnis ist voll ({zahlen['alle']} Einträge über alle "
-                            "Sitzungen). In OTA unter Mein Konto → Gedächtnis aufräumen.")
+                            "Sitzungen). In OTA unter opencode · Erinnerungen aufräumen.")
         neu = uuid.uuid4()
         conn.execute(
             "INSERT INTO eintrag (id, mensch, sitzung, art, inhalt, schlagworte, einbettung, modell, quelle) "
@@ -421,13 +458,18 @@ def abrufen(mensch: str, sitzung: str, anfrage: str = "", budget: int = 800,
     zeichen = max(200, min(int(budget or 800), 8000)) * 4
     with verbindung(mensch) as conn:
         sicht, namen = _sichtbar(conn, mensch, sitzung)
+        # Aus dem Hauptgedächtnis nur Angeheftetes: Der Rest kommt über die
+        # Suche, sonst füllte ein grosses Hauptgedächtnis jeden Abruf.
         alle = _herkunft(conn.execute(
-            "SELECT * FROM eintrag WHERE mensch = %s AND sitzung = ANY(%s)", (mensch, sicht)).fetchall(), namen)
+            "SELECT * FROM eintrag WHERE mensch = %s AND sitzung = ANY(%s) "
+            "AND (sitzung <> %s OR angeheftet OR %s = %s)",
+            (mensch, sicht, HAUPT, sitzung, HAUPT)).fetchall(), namen)
     j = jetzt()
     # Angeheftet: erst die eigenen, dann die aus anderen Sitzungen.
     angeheftet = sorted((e for e in alle if e["angeheftet"]),
                         key=lambda e: (e["sitzung"] == sitzung, e["geaendert"]), reverse=True)
-    passend = suchen(mensch, sitzung, anfrage, 30) if anfrage else []
+    passend = [e for e in (suchen(mensch, sitzung, anfrage, 30) if anfrage else [])
+               if e["sitzung"] != HAUPT or e["angeheftet"] or sitzung == HAUPT]
     rest = sorted(alle, key=lambda e: _gewicht(e, j) * e["geaendert"].timestamp(), reverse=True)
     raus, gesehen, laenge = [], set(), 0
     for e in [*angeheftet, *passend, *rest]:
@@ -452,6 +494,8 @@ def zeile_fuer(e: dict[str, Any]) -> str:
     """Eine Zeile je Eintrag: wenig Tokens, alles Nötige."""
     datum = e["geaendert"].strftime("%Y-%m-%d")
     marke = ", angeheftet" if e.get("angeheftet") else ""
-    if e.get("herkunft"):
+    if e.get("herkunft") == HAUPT:
+        marke += ", from the user's main memory, read-only"
+    elif e.get("herkunft"):
         marke += f', from session "{e["herkunft"]}", read-only'
     return f"[{kurz(e['id'])}] ({e['art']}, {datum}{marke}) {e['inhalt']}"

@@ -1,6 +1,7 @@
 """Nächtliche Pflege, um 03:30 (GEDAECHTNIS_PFLEGE_UHRZEIT):
 
-* Sitzungen ohne Aktivität seit `ablauf_tage` löschen (0: nie).
+* Sitzungen ohne Aktivität seit `ablauf_tage` löschen (0: nie), nie das
+  Hauptgedächtnis.
 * Einträge ohne Einbettung nachholen, auch nach einem Modellwechsel.
 * Widerrufene Tokens nach 7 Tagen, das Protokoll nach 180 Tagen löschen.
 
@@ -15,7 +16,7 @@ from datetime import datetime
 
 from psycopg.types.json import Jsonb
 
-from . import einbettung, einstellungen
+from . import einbettung, einstellungen, speicher
 from .db import verbindung
 
 log = logging.getLogger("gedaechtnis.pflege")
@@ -27,8 +28,9 @@ def einmal() -> dict[str, int]:
     with verbindung(system=True) as conn:
         if w["ablauf_tage"]:
             erg["sitzungen"] = conn.execute(
-                "DELETE FROM sitzung WHERE zuletzt_aktiv < now() - make_interval(days => %s)",
-                (int(w["ablauf_tage"]),)).rowcount
+                "DELETE FROM sitzung WHERE zuletzt_aktiv < now() - make_interval(days => %s) "
+                "AND kennung <> %s",  # das Hauptgedächtnis läuft nie ab
+                (int(w["ablauf_tage"]), speicher.HAUPT)).rowcount
         erg["tokens"] = conn.execute(
             "DELETE FROM token WHERE widerrufen < now() - interval '7 days'").rowcount
         conn.execute("DELETE FROM protokoll WHERE zeit < now() - interval '180 days'")

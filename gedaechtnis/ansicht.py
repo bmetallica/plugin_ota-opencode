@@ -1,5 +1,5 @@
-"""Die Ansicht, die OTA einbettet: Mein Konto → Gedächtnis und im ⋯-Menü
-eines Arbeitsplatzes.
+"""Die Ansicht, die OTA einbettet: opencode · Erinnerungen in der Seitenleiste
+und im ⋯-Menü eines Arbeitsplatzes.
 
 Wer schaut, steht in den von OTA signierten Kopfzeilen (zugang.py). Jeder
 sieht nur sein Eigenes — Admins genauso. Änderungen gehen als POST mit der
@@ -42,14 +42,27 @@ def _seite(request: Request, b: zugang.Betrachter, arbeitsplatz: str | None) -> 
     t = TEXTE[sprache]
     if arbeitsplatz is not None and arbeitsplatz not in b.arbeitsplaetze:
         raise HTTPException(403, t["fremd"])
+    speicher.haupt_anlegen(b.mensch)
     liste = speicher.sitzungen(b.mensch, [arbeitsplatz] if arbeitsplatz else None)
-    gewaehlt = request.query_params.get("s") or (liste[0]["kennung"] if liste else "")
-    aktuell = next((s for s in liste if s["kennung"] == gewaehlt), None)
+    # Das Hauptgedächtnis gehört zum Menschen, nicht zu einem Arbeitsplatz:
+    # Es steht in der Gesamtansicht, nicht im ⋯-Menü eines Platzes.
+    mit_haupt = arbeitsplatz is None
+    gewaehlt = request.query_params.get("s") or (
+        liste[0]["kennung"] if liste else (speicher.HAUPT if mit_haupt else ""))
+    haupt = gewaehlt == speicher.HAUPT and mit_haupt
+    if haupt:
+        aktuell = {"kennung": speicher.HAUPT, "titel": t["haupt"], "eigener_titel": None}
+    else:
+        aktuell = next((s for s in liste if s["kennung"] == gewaehlt), None)
     eintraege = speicher.eintraege(b.mensch, aktuell["kennung"]) if aktuell else []
-    vorschau = speicher.abrufen(b.mensch, aktuell["kennung"], vorschau=True) if aktuell else []
+    if haupt:
+        # Was jede Sitzung beim Abruf davon bekommt: nur das Angeheftete.
+        vorschau = [e for e in eintraege if e["angeheftet"]]
+    else:
+        vorschau = speicher.abrufen(b.mensch, aktuell["kennung"], vorschau=True) if aktuell else []
     alle = speicher.sitzungen(b.mensch) if aktuell else []
-    zugriffe = speicher.zugriffe(b.mensch, aktuell["kennung"]) if aktuell else []
-    gelesen_von = speicher.gelesen_von(b.mensch, aktuell["kennung"]) if aktuell else []
+    zugriffe = speicher.zugriffe(b.mensch, aktuell["kennung"]) if aktuell and not haupt else []
+    gelesen_von = speicher.gelesen_von(b.mensch, aktuell["kennung"]) if aktuell and not haupt else []
     gruppen: dict[str, list[dict[str, Any]]] = {}
     for s in liste:
         gruppen.setdefault(s["arbeitsplatz_name"] or t["ohne_arbeitsplatz"], []).append(s)
@@ -57,6 +70,8 @@ def _seite(request: Request, b: zugang.Betrachter, arbeitsplatz: str | None) -> 
     html = _jinja.get_template("ansicht.html").render(
         t=t, sprache=sprache, thema="hell" if request.query_params.get("thema") == "hell" else "dunkel",
         gruppen=gruppen, aktuell=aktuell, eintraege=eintraege, alle=alle,
+        haupt=haupt, mit_haupt=mit_haupt, haupt_kennung=speicher.HAUPT,
+        haupt_anzahl=speicher.haupt_anzahl(b.mensch) if mit_haupt else 0,
         zugriffe=zugriffe, gelesen_von=gelesen_von,
         vorschau=[speicher.zeile_fuer(e) for e in vorschau], arten=speicher.ARTEN,
         arbeitsplatz=arbeitsplatz, name=b.name, kurz=speicher.kurz,
@@ -167,7 +182,9 @@ def export(request: Request) -> Response:
         zeilen = [f"# Gedächtnis von {b.name}", ""]
         for teil in daten:
             si = teil["sitzung"]
-            zeilen += [f"## {si['eigener_titel'] or si['titel'] or si['kennung']}", "",
+            name = ("Hauptgedächtnis" if si["kennung"] == speicher.HAUPT
+                    else si["eigener_titel"] or si["titel"] or si["kennung"])
+            zeilen += [f"## {name}", "",
                        f"- Sitzung: `{si['kennung']}`", f"- Verzeichnis: `{si['verzeichnis']}`",
                        f"- Arbeitsplatz: {si['arbeitsplatz_name']}", ""]
             for e in teil["eintraege"]:
