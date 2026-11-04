@@ -7,7 +7,9 @@ Die Beschreibung des Vertrags steht in OTAs Handbuch, Kapitel 39.
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
+import json
 import logging
 import os
 import secrets
@@ -50,11 +52,24 @@ freigegeben ist."""
 
 
 def manifest() -> dict[str, Any]:
+    m = _manifest_ohne_version()
+    return {**m, "version": _version(m)}
+
+
+def _version(m: dict[str, Any]) -> str:
+    """OTA holt das Manifest neu, wenn sich die Version ändert (Gesundheit).
+    Ohne gesetzte Fassung (`dev`) hängt sie am Inhalt: Kommt ein Feld in der
+    Konfiguration dazu, sieht OTAs Formular es ohne neues Koppeln."""
+    if VERSION != "dev":
+        return VERSION
+    return "dev-" + hashlib.sha256(json.dumps(m, sort_keys=True).encode()).hexdigest()[:8]
+
+
+def _manifest_ohne_version() -> dict[str, Any]:
     return {
         "ota_schnittstelle": 1,
         "slug": "gedaechtnis",
         "name": "Gedächtnis für opencode",
-        "version": VERSION,
         "beschreibung": "Langzeitgedächtnis je opencode-Sitzung, über MCP. "
                         "Jede Sitzung sieht nur ihr eigenes Gedächtnis.",
         "pfade_fuer_arbeitsplaetze": ["/mcp"],
@@ -106,7 +121,7 @@ def gesund() -> dict[str, Any]:
     with verbindung(system=True) as conn:
         conn.execute("SELECT 1")
         zuletzt = conn.execute("SELECT wert FROM einstellung WHERE schluessel = 'pflege_zuletzt'").fetchone()
-    return {"ok": True, "version": VERSION, "einbettung": einbettung.zustand(),
+    return {"ok": True, "version": manifest()["version"], "einbettung": einbettung.zustand(),
             "pflege_zuletzt": zuletzt["wert"] if zuletzt else None}
 
 
